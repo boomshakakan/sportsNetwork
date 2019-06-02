@@ -64,19 +64,6 @@ class Dataset:
 # somehow we will have to determine starting lineups, this is somewhat
 # guarded data so for now hard coding might be easiest solution
 
-year = 2019
-team = 'GSW'
-
-dataset = Dataset(team)
-
-dataset.getPlayoffURL(year)
-dataset.getHTML()
-dataset.processHTML()
-
-for y in range(0,80):
-	print("{} : {} -> {}-{}".format(dataset.opponent_list[y], dataset.result_list[y], dataset.score_list[y], dataset.oppScore_list[y]))
-
-
 ''' some important columns to be able to locate:
 column 5 OR index 4 -> '' or '@' which shows 
 column 6 OR index 5 -> Opponent in form ("City TeamName")
