@@ -1,34 +1,65 @@
 '''This program is intended to gather pertinent data from "basketball-reference.com"
-and store it for later use in the network'''
+and store it for later use in the game prediction network'''
 
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import pandas as pd
 import re
 
-# gets url for playoff stats from desired team and year
-def getPlayoffURL(year, team):
-	url = "https://www.basketball-reference.com/teams/{}/{}_games.html#games_playoffs_link".format(team,year)
-	
-	return url
+class Dataset:
+	def __init__(self, team):
+		self.team = team
+		self.simple_url = "https://www.basketball-reference.com"
 
-# returns url of page for individual box scores
-# address should always begin with '/boxscores/...'
-def getGameURL(address):
-	simple_url = "https://www.basketball-reference.com"
-	game_url = simple_url + address;
-	
-	return game_url
+	# gets url for playoff stats from desired team and year
+	def getPlayoffURL(self, year):
+		self.url = "{}/teams/{}/{}_games.html#games_playoffs_link".format(self.simple_url, self.team, year)
 
-# obtains parsed HTML from URL
-def getHTML(url):
-	print("Getting HTML from URL:{}".format(url))
-	html = urlopen(url)
-	soup = BeautifulSoup(html, "html.parser")
-	
-	return soup
+	# obtains parsed HTML from URL
+	def getHTML(self):
+		print("Getting HTML from URL:{}".format(self.url))
+		self.html = urlopen(self.url)
+		self.soup = BeautifulSoup(self.html, "html.parser")
 
-#def processHTML(soup):
+	# returns url of page for individual box scores
+	# address should always begin with '/boxscores/...'
+	def getGameURL(self, address):
+		self.game_url = self.simple_url + address;
+
+	def processHTML(self):
+		# EVERYTHING BELOW COULD BE CONTAINED IN ITS OWN CLASS
+		# use getText() to extract the text content from first row column headers
+		headers = [th.getText() for th in self.soup.findAll('tr', limit=2)[0].findAll('th')]
+		rows = self.soup.findAll('tr')[0:]
+
+		# determine indeces where relevant data is located
+		for i in range(0,len(headers)):
+			if headers[i] == 'Opponent':
+				opponentIndex = i-1
+			elif headers[i] == 'Tm':
+				scoreIndex = i-1
+			elif headers[i] == 'Opp':
+				oppscoreIndex = i-1
+			elif headers[i] == 'Streak':
+				streakIndex = i-1
+
+		self.data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
+		print("Opponent: {} W/L: {} Score: {}-{}".format(self.data[1][5],self.data[1][6],self.data[1][8],self.data[1][9]))
+
+		self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list = ([] for i in range(6))
+		# successfully finds all the individual game rows and we move the 
+		# important data into separate lists
+		for x in range(1,len(self.data)):
+			if self.data[x] != []:
+				self.court_list.append(self.data[x][4])
+				self.opponent_list.append(self.data[x][opponentIndex])
+				self.result_list.append(self.data[x][6])
+				self.score_list.append(self.data[x][scoreIndex])
+				self.oppScore_list.append(self.data[x][oppscoreIndex])
+				self.streak_list.append(self.data[x][streakIndex])
+			# else:
+				# this occurs when we have an empty row that exists for formatting CAN BE OMITTED
+				# print("list at data[{}] empty".format(x))
 
 # somehow we will have to determine starting lineups, this is somewhat
 # guarded data so for now hard coding might be easiest solution
@@ -36,47 +67,15 @@ def getHTML(url):
 year = 2019
 team = 'GSW'
 
-url = getPlayoffURL(year, team)
-soup = getHTML(url)
+dataset = Dataset(team)
 
-# use findAll() to get column headers
-soup.findAll('tr', limit=2)
+dataset.getPlayoffURL(year)
+dataset.getHTML()
+dataset.processHTML()
 
-# use getText() to extract the text we need into a list
-headers = [th.getText() for th in soup.findAll('tr', limit=2)[0].findAll('th')]
-rows = soup.findAll('tr')[0:]
+for y in range(0,80):
+	print("{} : {} -> {}-{}".format(dataset.opponent_list[y], dataset.result_list[y], dataset.score_list[y], dataset.oppScore_list[y]))
 
-# determine indeces where we relevant data is located (pseudo-dynamic)
-for i in range(0,len(headers)):
-	if headers[i] == 'Opponent':
-		opponentIndex = i-1
-	elif headers[i] == 'Tm':
-		scoreIndex = i-1
-	elif headers[i] == 'Opp':
-		oppscoreIndex = i-1
-	elif headers[i] == 'Streak':
-		streakIndex = i-1
-
-data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
-print("Opponent: {} W/L: {} Score: {}-{}".format(data[1][5],data[1][6],data[1][8],data[1][9]))
-
-# this successfully finds all the individual game rows and we move the 
-# important data into separate lists
-court_list, opponent_list, result_list, score_list, oppScore_list, streak_list = ([] for i in range(6))
-for x in range(1,len(data)):
-	if not data[x]:
-		print("data[{}] list is empty".format(x))
-	else:
-		court_list.append(data[x][4])
-		opponent_list.append(data[x][opponentIndex])
-		result_list.append(data[x][6])
-		score_list.append(data[x][scoreIndex])
-		oppScore_list.append(data[x][oppscoreIndex])
-		streak_list.append(data[x][streakIndex])
-
-'''for y in range(0,80):
-	print("{} : {} -> {}-{}".format(opponent_list[y], result_list[y], score_list[y], oppScore_list[y]))
-'''
 
 ''' some important columns to be able to locate:
 column 5 OR index 4 -> '' or '@' which shows 
@@ -86,10 +85,11 @@ column 9 OR index 8 -> Team's Score
 column 10 OR index 9 -> Opponent Score 
 column 13 OR index 12 -> Team win streak '''
 
-# we must get the links to the box scores so we can further process this data
-links = []
+# we must get the links to the box scores so we can process individual player performance
+''' links = []
 for link in soup.findAll('a', attrs={'href': re.compile("^/boxscores")}):
 	links.append(link.get('href'))
+'''
 
 # find out how to filter through the reference links to get player stats
 
