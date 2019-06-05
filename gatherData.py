@@ -4,29 +4,34 @@ and store it for later use in the game prediction network'''
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import pandas as pd
+import datetime
 import re
 
 class Dataset:
 	def __init__(self, team):
+		# define import variables and initialize empty list containers
 		self.team = team
 		self.simple_url = "https://www.basketball-reference.com"
+		self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list = ([] for i in range(6))
 
 	# gets url for playoff stats from desired team and year
-	def getPlayoffURL(self, year):
-		self.url = "{}/teams/{}/{}_games.html#games_playoffs_link".format(self.simple_url, self.team, year)
+	def getTeamURL(self, year):
+		self.game_url = "{}/teams/{}/{}_games.html#games_playoffs_link".format(self.simple_url, self.team, year)
 
-	# obtains parsed HTML from URL
-	def getHTML(self):
-		print("Getting HTML from URL:{}".format(self.url))
-		self.html = urlopen(self.url)
-		self.soup = BeautifulSoup(self.html, "html.parser")
+	def getLineupURL(self):
+		self.lineup_url = "https://www.nbastartingfive.com"
 
-	# returns url of page for individual box scores
-	# address should always begin with '/boxscores/...'
 	def getGameURL(self, address):
+		# returns url of page for individual box scores	
 		self.game_url = self.simple_url + address;
 
-	def processHTML(self):
+	def getHTML(self, url):
+		# obtains parsed HTML from URL
+		print("Getting HTML from URL:{}".format(url))
+		self.html = urlopen(url)
+		self.soup = BeautifulSoup(self.html, "html.parser")
+
+	def processTeamHTML(self):
 		# EVERYTHING BELOW COULD BE CONTAINED IN ITS OWN CLASS
 		# use getText() to extract the text content from first row column headers
 		headers = [th.getText() for th in self.soup.findAll('tr', limit=2)[0].findAll('th')]
@@ -44,11 +49,9 @@ class Dataset:
 				streakIndex = i-1
 
 		self.data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
-		print("Opponent: {} W/L: {} Score: {}-{}".format(self.data[1][5],self.data[1][6],self.data[1][8],self.data[1][9]))
+		# print("Opponent: {} W/L: {} Score: {}-{}".format(self.data[1][5],self.data[1][6],self.data[1][8],self.data[1][9]))
 
-		self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list = ([] for i in range(6))
-		# successfully finds all the individual game rows and we move the 
-		# important data into separate lists
+		# successfully finds all the individual game rows and we move the important data into separate lists
 		for x in range(1,len(self.data)):
 			if self.data[x] != []:
 				self.court_list.append(self.data[x][4])
@@ -60,6 +63,52 @@ class Dataset:
 			# else:
 				# this occurs when we have an empty row that exists for formatting CAN BE OMITTED
 				# print("list at data[{}] empty".format(x))
+
+	def processLineupHTML(self):
+
+
+	def process10Years(self):
+	# uses class methods to obtain team data from past 10 years
+
+		d = datetime.datetime.today()
+		currYear = int(d.year)
+		# collects data from the past decade into containers
+		for x in range(0,10):
+
+			self.getTeamURL(currYear - x)
+			self.getHTML()
+			self.processHTML()
+
+	def save(self):
+	# loops over contents of lists and saves to text file
+		with open("court.txt", 'w') as writeFile:
+			for item in dataset.court_list:
+				writeFile.write("%s\n" % item)
+
+		with open("opponent.txt", 'w') as writeFile:
+			for item in dataset.opponent_list:
+				writeFile.write("%s\n" % item)
+
+		with open("results.txt", 'w') as writeFile:
+			for item in dataset.result_list:
+				writeFile.write("%s\n" % item)
+
+		with open("teamScore.txt", 'w') as writeFile:
+			for item in dataset.score_list:
+				writeFile.write("%s\n" % item)
+
+		with open("oppScore.txt", 'w') as writeFile:
+			for item in dataset.oppScore_list:
+				writeFile.write("%s\n" % item)
+
+		with open("streak.txt", 'w') as writeFile:
+			for item in dataset.streak_list:
+				writeFile.write("%s\n" % item)
+
+	def clearLists(self):
+	# clears the contents of all lists
+		self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list = ([] for i in range(6))
+
 
 # somehow we will have to determine starting lineups, this is somewhat
 # guarded data so for now hard coding might be easiest solution
