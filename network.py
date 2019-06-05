@@ -29,11 +29,10 @@ if __name__ == "__main__":
 
 	dataset = Dataset(team)
 
-	dataset.process10Years()
-	print(len(dataset.opponent_list))
-	print(len(dataset.court_list))
-	print(len(dataset.result_list))
-	
+	#dataset.process10Years()
+	dataset.getTeamURL(year)
+	dataset.getHTML(dataset.lineup_url)
+	dataset.processLineupHTML()
 
 	'''
 	dataset.getPlayoffURL(year)
