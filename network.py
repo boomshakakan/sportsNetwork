@@ -27,12 +27,18 @@ if __name__ == "__main__":
 	year = 2019
 	team = 'GSW'
 
-	dataset = Dataset(team)
+	dataset = Dataset()
 
 	#dataset.process10Years()
-	dataset.getTeamURL(year)
-	dataset.getHTML(dataset.lineup_url)
-	dataset.processLineupHTML()
+	dataset.getTeamURL(team, year)
+	dataset.getHTML(dataset.team_url)
+	dataset.processTeamHTML()
+
+	dataset.processBoxHTML()
+
+	# league = League(dataset.team_list)
+	# print(league.teams)
+
 
 	'''
 	dataset.getPlayoffURL(year)
