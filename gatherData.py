@@ -3,36 +3,12 @@ and store it for later use in the game prediction network'''
 
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
+from sqlite3 import Error
 import pandas as pd
+import sqlite3
 import datetime
 import re
 import os
-
-'''
-class gameStats:
-	def __init__(self, stats):
-		if stats != []:
-			for stat in stats:
-
-
-class League:
-	def __init__(self, teams):
-		self.teams = []
-		if teams != []:
-			for team in teams:
-				print(team)
-				self.teams.append(Team(team))
-'''
-
-class Player:
-	def __init__(self, name, team):
-		self.games = []
-		self.name = name
-		self.team = team
-
-
-
-
 
 class Dataset():
 	def __init__(self):
@@ -42,8 +18,32 @@ class Dataset():
 		self.name_list = ["court", "opponent", "results", "teamScore", "oppScore", "streak", "links"]
 		self.team_list = ["GWS", "TOR", "CHI", "DEN", "ATL", "BOS", "CHO", "CLE", "DAL", "DET", "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", \
 		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHX", "POR", "SAS", "SAC", "WAS", "DAL", "UTA"]
-		self.lists, self.links, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.teams \
-		= ([] for i in range(9))
+		self.lists, self.links, self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.teams \
+		= ([] for i in range(10))
+
+	def createConnection(self):
+		# creates the sqlite3 database connection
+		try:
+			self.conn = sqlite3.connect('bball_data.db')
+			print("Database connection created...")
+		except Error as e:
+			print(e)
+
+	def destroyConnection(self):
+		# closes the sqlite db connection
+		self.conn.close()
+		print("Database connection destroyed...")
+
+	#def createTeam(self):
+
+
+
+	def createTables(self):
+		# creates sqlite db table with input name and 
+		if self.conn:
+			cur = self.conn.cursor()
+			cur.execute('CREATE TABLE TEAMS (name VARCHAR, description VARCHAR)')
+			self.conn.commit()
 
 	def getTeamURL(self, team, year):
 		# gets url for playoff stats from desired team and year
@@ -62,10 +62,33 @@ class Dataset():
 	def processTeamHTML(self):
 		# parses html from team page and extracts useful data into lists
 		# use getText() to extract the text content from first row column headers
+		table_body = self.soup.findAll('tbody')
 		headers = [th.getText() for th in self.soup.findAll('tr', limit=2)[0].findAll('th')]
 		rows = self.soup.findAll('tr')[0:]
+		
+		for x in range(0, len(table_body)):
+			links = [table_body[x].findAll('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})]
+			for link in links:
+				score_link = link.get('href')
+				print(link)
+				self.links.append(link)
+		
+		'''
+		for link in self.soup.findAll('a', attrs={'href': re.compile("^/boxscores/[0-9]+")}):
+			# page format gives us 1 extra link that shows last game played and is first item in list
+			# we want the first item in the list to not be entered... 
+			score_link = link.get('href')
+			self.links.append(score_link)
+
+			print(score_link)
+			#print(re.search('/(.+?){}'))
+		'''
+		# the links themselves contain information about the date so we may use these to obtain dates
+
+		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
 
 		''' some important columns to be able to locate:
+		column 1 or index 0 -> date
 		column 5 OR index 4 -> '' or '@' which shows 
 		column 6 OR index 5 -> Opponent in form ("City TeamName")
 		column 7 OR index 6 -> 'W' or 'L' 
@@ -73,43 +96,41 @@ class Dataset():
 		column 10 OR index 9 -> Opponent Score 
 		column 13 OR index 12 -> Team win streak '''
 
-		# determine indeces where relevant data is located
-		for i in range(0,len(headers)):
-			if headers[i] == 'Opponent':
-				opponentIndex = i-1
-			elif headers[i] == 'Tm':
-				scoreIndex = i-1
-			elif headers[i] == 'Opp':
-				oppscoreIndex = i-1
-			elif headers[i] == 'Streak':
-				streakIndex = i-1
-
-		for link in self.soup.findAll('a', attrs={'href': re.compile("^/boxscores/[0-9]+")}):
-			self.links.append(link.get('href'))
-		# figure out why links has extra element
-		print(len(self.links))
-
-		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
-
-		# print("Opponent: {} W/L: {} Score: {}-{}".format(self.data[1][5],self.data[1][6],self.data[1][8],self.data[1][9]))
 		# successfully finds all the individual game rows and we move the important data into separate lists
-		for x in range(1,len(self.text_data)):
+		for x in range(0,len(self.text_data)):
 			if self.text_data[x] != []:
-				
+
 				self.court_list.append(self.text_data[x][4])
-				self.opponent_list.append(self.text_data[x][opponentIndex])
+				self.opponent_list.append(self.text_data[x][5])
 				self.result_list.append(self.text_data[x][6])
-				self.score_list.append(self.text_data[x][scoreIndex])
-				self.oppScore_list.append(self.text_data[x][oppscoreIndex])
-				self.streak_list.append(self.text_data[x][streakIndex])
+				self.score_list.append(self.text_data[x][8])
+				self.oppScore_list.append(self.text_data[x][9])
+				self.streak_list.append(self.text_data[x][12])
 
 		# make list of all lists
-		self.lists = [self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.links]
+		self.lists = [self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.links]
+
+	def gatherStats(self):
+		# peek at the box score page and pull stats to make dictionaries, self.stats is an array of two lists
+		if self.links != []:
+			self.stats = []
+			self.getGameURL(self.links[0])
+			self.getHTML(self.game_url)
+
+			table_headers = self.soup.findAll('thead')
+			# find Basic Box Score Stats
+			basicStat = [th.getText() for th in table_headers[0].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
+			self.stats.append(basicStat)
+			advStat = [th.getText() for th in table_headers[1].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
+			self.stats.append(advStat[1:])
+			print("basic stats: {}".format(len(basicStat)))
+			print("adv stats: {}".format(len(advStat)))
+			print(self.stats)
 
 	def processBoxHTML(self):
 		# parses html from box score page and pulls useful data 
-		# you must execute processTeamHTML to obtain links before calling this function
-		if self.links != []:
+		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
+		if (self.links and self.stats):
 			for link in range(0,1):
 				self.getGameURL(self.links[link])
 				self.getHTML(self.game_url)
@@ -118,29 +139,24 @@ class Dataset():
 				# find name of teams 
 				# teams = body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})
 				teams = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
-				# print(teams)
+				date = [meta.getText() for meta in body.findAll('div', attrs={'class': "scorebox_meta"})]
+				print(len(date))
 				table_headers = self.soup.findAll('thead')
 				table_body = self.soup.findAll('tbody')
-				# from this we get an array of all the tbody elements, total of 4
+				# from this we get an array of all the table body and header HTML, total of 4
+
 				if len(table_headers) == len(table_body):
 					stat_data = []
 					for table in range(0,len(table_body)):
 						rows = table_body[table].findAll('tr')
-						if table % 2 == 1:
-							stats = [th.getText() for th in table_headers[table].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
-							stat_data.append(stats)
-						else:
-							header = [th.getText() for th in table_headers[table].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
-							stat_data.append(header)
 						for row in rows:
 							name = row.find('th').getText()
-							print(name)
+							# print(name)
 							row_data = [td.getText() for td in row.findAll('td')]
+							# print(len(row_data))
 
-	def createTeams(self):
+	# def createTeams(self):
 		# method will create all team rosters using team_list and most recent box scores
-		for x in range(0,len())
-
 
 	def process10Years(self):
 		# uses class methods to obtain team data from past 10 years
@@ -173,3 +189,7 @@ class Dataset():
 			for y in range(0,len(self.name_list)):
 				fileName = "{}.txt".format(self.name_list[y])
 				os.remove(fileName)
+
+	def deleteDB(self):
+		os.remove('bball_data.db')
+

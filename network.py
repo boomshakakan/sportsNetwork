@@ -28,28 +28,17 @@ if __name__ == "__main__":
 	team = 'GSW'
 
 	dataset = Dataset()
+	
+	# dataset.createConnection()
+	# dataset.createTables()
 
 	#dataset.process10Years()
 	dataset.getTeamURL(team, year)
 	dataset.getHTML(dataset.team_url)
 	dataset.processTeamHTML()
 
+	dataset.gatherStats()
 	dataset.processBoxHTML()
-
-	# league = League(dataset.team_list)
-	# print(league.teams)
-
-
-	'''
-	dataset.getPlayoffURL(year)
-	dataset.getHTML()
-	dataset.processHTML()
-
-	print(dataset.opponent_list)
-
-	
-	for y in range(0,80):
-		print("{} : {} -> {}-{}".format(dataset.opponent_list[y], dataset.result_list[y], dataset.score_list[y], dataset.oppScore_list[y]))
-	'''
-	
+	# dataset.destroyConnection()
+	# dataset.deleteDB()
 
