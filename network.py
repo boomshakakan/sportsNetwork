@@ -22,23 +22,24 @@ class neuralNetwork:
 			adjustments = np.dot(training_inputs.T, error * self.sigmoid_derivative(output))
 			self.synaptic_weights += adjustments
 
-if __name__ == "__main__":
-	
-	year = 2019
-	team = 'GSW'
-
+def main():
 	dataset = Dataset()
-	
-	# dataset.createConnection()
-	# dataset.createTables()
 
-	#dataset.process10Years()
+	team = 'GSW'
+	year = 2019
+	
+	dataset.createConnection()
 	dataset.getTeamURL(team, year)
 	dataset.getHTML(dataset.team_url)
+	# process the HTML from passed url
 	dataset.processTeamHTML()
-
 	dataset.gatherStats()
+	dataset.createTeams()
 	dataset.processBoxHTML()
-	# dataset.destroyConnection()
-	# dataset.deleteDB()
+
+	dataset.destroyConnection()
+
+if __name__ == "__main__":
+	main()
+	
 

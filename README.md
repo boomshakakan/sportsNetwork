@@ -7,4 +7,4 @@ network.py:
 Data used as nuerons in network
 
 
-WHEN CREATING DATABASE: Tables holding teams will hold roster and player information on a basic level and the player tables will hold the statistics of the player themselves 
+WHEN CREATING DATABASE: Tables holding teams will hold roster and player information on a basic level / player tables will hold the statistics of the player themselves with relations to seasons which hold all individual game stats

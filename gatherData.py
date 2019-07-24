@@ -14,7 +14,6 @@ class Dataset():
 	def __init__(self):
 		# define names for teams a and initialize empty list containers
 		self.simple_url = "https://www.basketball-reference.com"
-		self.lineup_url = "http://nbastartingfive.com/"
 		self.name_list = ["court", "opponent", "results", "teamScore", "oppScore", "streak", "links"]
 		self.team_list = ["GWS", "TOR", "CHI", "DEN", "ATL", "BOS", "CHO", "CLE", "DAL", "DET", "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", \
 		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHX", "POR", "SAS", "SAC", "WAS", "DAL", "UTA"]
@@ -34,16 +33,26 @@ class Dataset():
 		self.conn.close()
 		print("Database connection destroyed...")
 
-	#def createTeam(self):
+	def createTeams(self):
+		# this function will take the most recent game roster of all NBA teams and create a database for each 
 
-
-
-	def createTables(self):
-		# creates sqlite db table with input name and 
 		if self.conn:
 			cur = self.conn.cursor()
-			cur.execute('CREATE TABLE TEAMS (name VARCHAR, description VARCHAR)')
+			
+			for idx, team in enumerate(self.team_list):
+				print(team)
+				sql = 
+				''
+				cur.execute('INSERT INTO teams (team_ID, name) VALUES (?,?);', (idx+1,team,))
+				
 			self.conn.commit()
+			return cur.lastrowid
+
+	def destroyTeams(self, cursor):
+		# drops TEAMS table from database (this should be done before recreating db)
+		sql = 'DROP TABLE IF EXISTS teams;'
+		cursor.execute(sql)
+		print("Table dropped from database...")
 
 	def getTeamURL(self, team, year):
 		# gets url for playoff stats from desired team and year
@@ -65,24 +74,16 @@ class Dataset():
 		table_body = self.soup.findAll('tbody')
 		headers = [th.getText() for th in self.soup.findAll('tr', limit=2)[0].findAll('th')]
 		rows = self.soup.findAll('tr')[0:]
+
+		# lastgameLink finds the link for the team's most recently played game which is how we create teams
+		self.lastgameLink = (self.soup.find('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})).get('href')
 		
-		for x in range(0, len(table_body)):
-			links = [table_body[x].findAll('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})]
-			for link in links:
-				score_link = link.get('href')
-				print(link)
-				self.links.append(link)
-		
-		'''
-		for link in self.soup.findAll('a', attrs={'href': re.compile("^/boxscores/[0-9]+")}):
-			# page format gives us 1 extra link that shows last game played and is first item in list
-			# we want the first item in the list to not be entered... 
+		for link in self.soup.findAll('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})[1:]:
+	
 			score_link = link.get('href')
 			self.links.append(score_link)
-
 			print(score_link)
 			#print(re.search('/(.+?){}'))
-		'''
 		# the links themselves contain information about the date so we may use these to obtain dates
 
 		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
@@ -140,8 +141,8 @@ class Dataset():
 				# teams = body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})
 				teams = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
 				date = [meta.getText() for meta in body.findAll('div', attrs={'class': "scorebox_meta"})]
-				print(len(date))
 				table_headers = self.soup.findAll('thead')
+				print(len(date))
 				table_body = self.soup.findAll('tbody')
 				# from this we get an array of all the table body and header HTML, total of 4
 
@@ -151,9 +152,9 @@ class Dataset():
 						rows = table_body[table].findAll('tr')
 						for row in rows:
 							name = row.find('th').getText()
-							# print(name)
+							print("Name: {}".format(name))
 							row_data = [td.getText() for td in row.findAll('td')]
-							# print(len(row_data))
+							print(row_data)
 
 	# def createTeams(self):
 		# method will create all team rosters using team_list and most recent box scores
