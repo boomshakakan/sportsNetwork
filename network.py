@@ -34,7 +34,7 @@ def main():
 	# process the HTML from passed url
 	dataset.processTeamHTML()
 	dataset.gatherStats()
-	dataset.createTeams()
+	dataset.populateDB()
 	dataset.processBoxHTML()
 
 	dataset.destroyConnection()

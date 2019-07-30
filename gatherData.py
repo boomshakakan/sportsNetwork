@@ -33,26 +33,20 @@ class Dataset():
 		self.conn.close()
 		print("Database connection destroyed...")
 
-	def createTeams(self):
-		# this function will take the most recent game roster of all NBA teams and create a database for each 
-
+	def populateDB(self):
+		# this function will take the most recent game roster of all NBA teams and fill tables in our database
+		# this is to be only called ONCE, anymore calls to this function will result in data confuscation
+		
 		if self.conn:
 			cur = self.conn.cursor()
 			
 			for idx, team in enumerate(self.team_list):
-				print(team)
-				sql = 
-				''
 				cur.execute('INSERT INTO teams (team_ID, name) VALUES (?,?);', (idx+1,team,))
 				
-			self.conn.commit()
-			return cur.lastrowid
+				# we want to add all relevant data to our tables in this function
+				# next we add player information to player table
 
-	def destroyTeams(self, cursor):
-		# drops TEAMS table from database (this should be done before recreating db)
-		sql = 'DROP TABLE IF EXISTS teams;'
-		cursor.execute(sql)
-		print("Table dropped from database...")
+			self.conn.commit()
 
 	def getTeamURL(self, team, year):
 		# gets url for playoff stats from desired team and year
@@ -88,14 +82,16 @@ class Dataset():
 
 		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
 
-		''' some important columns to be able to locate:
+		''' 
+		some important columns to be able to locate:
 		column 1 or index 0 -> date
 		column 5 OR index 4 -> '' or '@' which shows 
 		column 6 OR index 5 -> Opponent in form ("City TeamName")
 		column 7 OR index 6 -> 'W' or 'L' 
 		column 9 OR index 8 -> Team's Score 
 		column 10 OR index 9 -> Opponent Score 
-		column 13 OR index 12 -> Team win streak '''
+		column 13 OR index 12 -> Team win streak 
+		'''
 
 		# successfully finds all the individual game rows and we move the important data into separate lists
 		for x in range(0,len(self.text_data)):
