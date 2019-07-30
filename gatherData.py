@@ -23,6 +23,7 @@ class Dataset():
 	def createConnection(self):
 		# creates the sqlite3 database connection
 		try:
+			# if no db with this name is found, one will be created
 			self.conn = sqlite3.connect('bball_data.db')
 			print("Database connection created...")
 		except Error as e:
@@ -41,9 +42,9 @@ class Dataset():
 			cur = self.conn.cursor()
 			
 			for idx, team in enumerate(self.team_list):
-				cur.execute('INSERT INTO teams (team_ID, name) VALUES (?,?);', (idx+1,team,))
+				cur.execute('INSERT INTO teams (name) VALUES (?);', (team,))
+				# for every team we take the most recent game to determine roster
 				
-				# we want to add all relevant data to our tables in this function
 				# next we add player information to player table
 
 			self.conn.commit()

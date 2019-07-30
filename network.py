@@ -35,7 +35,7 @@ def main():
 	dataset.processTeamHTML()
 	dataset.gatherStats()
 	dataset.populateDB()
-	dataset.processBoxHTML()
+	#dataset.processBoxHTML()
 
 	dataset.destroyConnection()
 
