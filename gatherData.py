@@ -15,10 +15,11 @@ class Dataset():
 		# define names for teams a and initialize empty list containers
 		self.simple_url = "https://www.basketball-reference.com"
 		self.name_list = ["court", "opponent", "results", "teamScore", "oppScore", "streak", "links"]
-		self.team_list = ["GWS", "TOR", "CHI", "DEN", "ATL", "BOS", "CHO", "CLE", "DAL", "DET", "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", \
+		self.team_list = ["GSW", "TOR", "CHI", "DEN", "ATL", "BOS", "CHO", "CLE", "DAL", "DET", "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", \
 		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHX", "POR", "SAS", "SAC", "WAS", "DAL", "UTA"]
 		self.lists, self.links, self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.teams \
 		= ([] for i in range(10))
+		self.players = []
 
 	def createConnection(self):
 		# creates the sqlite3 database connection
@@ -44,7 +45,12 @@ class Dataset():
 			for idx, team in enumerate(self.team_list):
 				cur.execute('INSERT INTO teams (name) VALUES (?);', (team,))
 				# for every team we take the most recent game to determine roster
-				
+				print(team)
+				self.getTeamURL(team, 2019)
+				self.getHTML(self.team_url)
+				self.processTeamHTML()
+				print(len(self.links))
+
 				# next we add player information to player table
 
 			self.conn.commit()
@@ -66,6 +72,7 @@ class Dataset():
 	def processTeamHTML(self):
 		# parses html from team page and extracts useful data into lists
 		# use getText() to extract the text content from first row column headers
+		self.links = []
 		table_body = self.soup.findAll('tbody')
 		headers = [th.getText() for th in self.soup.findAll('tr', limit=2)[0].findAll('th')]
 		rows = self.soup.findAll('tr')[0:]
@@ -77,8 +84,7 @@ class Dataset():
 	
 			score_link = link.get('href')
 			self.links.append(score_link)
-			print(score_link)
-			#print(re.search('/(.+?){}'))
+			# print(score_link)
 		# the links themselves contain information about the date so we may use these to obtain dates
 
 		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]

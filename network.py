@@ -28,14 +28,14 @@ def main():
 	team = 'GSW'
 	year = 2019
 	
+	# creates the connection to the sqlite3 database
 	dataset.createConnection()
-	dataset.getTeamURL(team, year)
-	dataset.getHTML(dataset.team_url)
+	# dataset.getTeamURL(team, year)
+	# dataset.getHTML(dataset.team_url)
 	# process the HTML from passed url
-	dataset.processTeamHTML()
-	dataset.gatherStats()
+	# dataset.processTeamHTML()
+	# dataset.gatherStats()
 	dataset.populateDB()
-	#dataset.processBoxHTML()
 
 	dataset.destroyConnection()
 
