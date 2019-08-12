@@ -16,7 +16,7 @@ class Dataset():
 		self.simple_url = "https://www.basketball-reference.com"
 		self.name_list = ["court", "opponent", "results", "teamScore", "oppScore", "streak", "links"]
 		self.team_list = ["GSW", "TOR", "CHI", "DEN", "ATL", "BOS", "CHO", "CLE", "DAL", "DET", "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", \
-		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHX", "POR", "SAS", "SAC", "WAS", "DAL", "UTA"]
+		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHO", "POR", "SAS", "SAC", "WAS", "DAL", "UTA"]
 		self.lists, self.links, self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.teams \
 		= ([] for i in range(10))
 		self.players = []
@@ -42,7 +42,9 @@ class Dataset():
 		if self.conn:
 			cur = self.conn.cursor()
 			
-			for idx, team in enumerate(self.team_list):
+			for team in self.team_list:
+				cur.execute('.read killDB.sql')
+				cur.execute('.read buildDB.sql')
 				cur.execute('INSERT INTO teams (name) VALUES (?);', (team,))
 				# for every team we take the most recent game to determine roster
 				print(team)
@@ -129,8 +131,6 @@ class Dataset():
 			self.stats.append(advStat[1:])
 			print("basic stats: {}".format(len(basicStat)))
 			print("adv stats: {}".format(len(advStat)))
-            print(len(self.stats))
-            # print(self.stats)
 
 	def processBoxHTML(self):
 		# parses html from box score page and pulls useful data 
