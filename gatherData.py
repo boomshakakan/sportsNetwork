@@ -129,7 +129,8 @@ class Dataset():
 			self.stats.append(advStat[1:])
 			print("basic stats: {}".format(len(basicStat)))
 			print("adv stats: {}".format(len(advStat)))
-			print(self.stats)
+            print(len(self.stats))
+            # print(self.stats)
 
 	def processBoxHTML(self):
 		# parses html from box score page and pulls useful data 
@@ -158,9 +159,6 @@ class Dataset():
 							print("Name: {}".format(name))
 							row_data = [td.getText() for td in row.findAll('td')]
 							print(row_data)
-
-	# def createTeams(self):
-		# method will create all team rosters using team_list and most recent box scores
 
 	def process10Years(self):
 		# uses class methods to obtain team data from past 10 years
