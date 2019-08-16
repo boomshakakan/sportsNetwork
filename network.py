@@ -1,4 +1,4 @@
-from gatherData import Dataset
+from gatherData import Dataset, League, Team, Game
 import numpy as np
 
 class neuralNetwork:
@@ -38,6 +38,7 @@ def main():
 	dataset.populateDB()
 
 	dataset.destroyConnection()
+	print(len(dataset.league.team_dict))
 
 if __name__ == "__main__":
 	main()

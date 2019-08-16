@@ -10,6 +10,29 @@ import datetime
 import re
 import os
 
+# game object holds date of game
+class Game():
+	def __init__(self, date):
+		self.date = date
+		print('Game Initialized')
+
+# team object holds onto a list of games 
+class Team(Game):
+	def __init__(self, tag):
+		self.games = []
+		self.roster = []
+		self.tag = tag
+		print('Team Initialized: '+ self.tag)
+
+class League(Team, Game):
+	def __init__(self, team_list):
+		self.teams = []
+		self.player_list = []
+		self.team_dict = {}
+		for x in range(0,len(team_list)):
+			self.teams.append(Team(team_list[x]))
+		print('League Initialized')
+
 class Dataset():
 	def __init__(self):
 		# define names for teams a and initialize empty list containers
@@ -17,9 +40,10 @@ class Dataset():
 		self.name_list = ["court", "opponent", "results", "teamScore", "oppScore", "streak", "links"]
 		self.team_list = ["GSW", "TOR", "CHI", "DEN", "ATL", "BOS", "CHO", "CLE", "DAL", "DET", "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", \
 		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHO", "POR", "SAS", "SAC", "WAS", "DAL", "UTA"]
+		self.league = League(self.team_list)
+
 		self.lists, self.links, self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.teams \
 		= ([] for i in range(10))
-		self.players = []
 
 	def createConnection(self):
 		# creates the sqlite3 database connection
@@ -32,8 +56,11 @@ class Dataset():
 
 	def destroyConnection(self):
 		# closes the sqlite db connection
-		self.conn.close()
-		print("Database connection destroyed...")
+		if self.conn:
+			self.conn.close()
+			print("Database connection destroyed...")
+		else:
+			print("No database connection found...")
 
 	def populateDB(self):
 		# this function will take the most recent game roster of all NBA teams and fill tables in our database
@@ -42,20 +69,46 @@ class Dataset():
 		if self.conn:
 			cur = self.conn.cursor()
 			
-			for team in self.team_list:
-				cur.execute('.read killDB.sql')
-				cur.execute('.read buildDB.sql')
-				cur.execute('INSERT INTO teams (name) VALUES (?);', (team,))
-				# for every team we take the most recent game to determine roster
-				print(team)
-				self.getTeamURL(team, 2019)
+			for x in range(0, len(self.league.teams)):
+
+				# we want to create roster using self.lastgamelink only for most recent year 
+	
+				self.getTeamURL(self.league.teams[x].tag, 2019)
 				self.getHTML(self.team_url)
 				self.processTeamHTML()
+				self.gatherStats()
+				self.processBoxHTML()
 				print(len(self.links))
 
-				# next we add player information to player table
-
+			# next we add player information to player table
 			self.conn.commit()
+
+	def getTag(self, teamName):
+		# given full team name (locality Name) create dictionary to team's tag
+		if teamName in self.league.team_dict:
+			print('name already in dictionary')
+			print('Tag is: {}'.format(self.league.team_dict[teamName]))
+			return self.league.team_dict[teamName]
+		else:
+			# here we observe the teamName to find matches to tags and populate dictionary to correspond
+			# there are a few ways that tags are generated
+			# 1) first 3 letters of locality
+			name = teamName.split(" ")
+			for x in range(0, len(self.team_list)):
+				if (name[0][0:3].upper() == self.team_list[x][0:3]):
+					print('Match Found!')
+					print('{}:{}'.format(name[0][0:3], self.team_list[x][0:3]))
+					print('{}:{}'.format(name, self.team_list[x]))
+					self.league.team_dict[teamName] = self.team_list[x]
+				elif (len(name) == 3):
+					tmp = name[0][0] + name[1][0] + name[2][0]
+					if (tmp.upper() == self.team_list[x]):
+						print('Match Found!')
+						print('{}:{}'.format(tmp, self.team_list[x]))
+						self.league.team_dict[teamName] = self.team_list[x]
+				else:
+					print('Not included {}'.format(teamName))
+
 
 	def getTeamURL(self, team, year):
 		# gets url for playoff stats from desired team and year
@@ -70,6 +123,18 @@ class Dataset():
 		print("Getting HTML from URL:{}".format(url))
 		self.html = urlopen(url)
 		self.soup = BeautifulSoup(self.html, "html.parser")
+
+	def getDate(self, link):
+		# retrieves date from box url link using regex
+		print(link)
+		r = re.findall(r'\d+', link)
+		date = r[0]
+		year = date[0:4]
+		month = date[4:6]
+		day = date[6:8]
+		date_stamp = year + '-' + month + '-' + day
+		print(date_stamp)
+		return date_stamp
 
 	def processTeamHTML(self):
 		# parses html from team page and extracts useful data into lists
@@ -86,7 +151,6 @@ class Dataset():
 	
 			score_link = link.get('href')
 			self.links.append(score_link)
-			# print(score_link)
 		# the links themselves contain information about the date so we may use these to obtain dates
 
 		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
@@ -120,6 +184,7 @@ class Dataset():
 		# peek at the box score page and pull stats to make dictionaries, self.stats is an array of two lists
 		if self.links != []:
 			self.stats = []
+
 			self.getGameURL(self.links[0])
 			self.getHTML(self.game_url)
 
@@ -129,6 +194,7 @@ class Dataset():
 			self.stats.append(basicStat)
 			advStat = [th.getText() for th in table_headers[1].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
 			self.stats.append(advStat[1:])
+			# print(self.stats)
 			print("basic stats: {}".format(len(basicStat)))
 			print("adv stats: {}".format(len(advStat)))
 
@@ -136,29 +202,33 @@ class Dataset():
 		# parses html from box score page and pulls useful data 
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
 		if (self.links and self.stats):
-			for link in range(0,1):
-				self.getGameURL(self.links[link])
+			for idx in range(0,1):
+				self.getGameURL(self.links[idx])
 				self.getHTML(self.game_url)
+				self.getDate(self.links[idx])
 				
 				body = self.soup.find('body')
-				# find name of teams 
-				# teams = body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})
+				# find name of teams
 				teams = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
-				date = [meta.getText() for meta in body.findAll('div', attrs={'class': "scorebox_meta"})]
+				print(teams)
+				for x in range(0,len(teams)):
+					self.getTag(teams[x])
+
 				table_headers = self.soup.findAll('thead')
-				print(len(date))
 				table_body = self.soup.findAll('tbody')
-				# from this we get an array of all the table body and header HTML, total of 4
+				# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
 
 				if len(table_headers) == len(table_body):
-					stat_data = []
 					for table in range(0,len(table_body)):
 						rows = table_body[table].findAll('tr')
 						for row in rows:
 							name = row.find('th').getText()
-							print("Name: {}".format(name))
+							# print("Name: {}".format(name))
 							row_data = [td.getText() for td in row.findAll('td')]
-							print(row_data)
+							# print(row_data)
+
+
+
 
 	def process10Years(self):
 		# uses class methods to obtain team data from past 10 years
