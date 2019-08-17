@@ -39,6 +39,7 @@ def main():
 
 	dataset.destroyConnection()
 	print(len(dataset.league.team_dict))
+	print(dataset.league.team_dict)
 
 if __name__ == "__main__":
 	main()

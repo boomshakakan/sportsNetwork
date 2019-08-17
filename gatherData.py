@@ -94,21 +94,23 @@ class Dataset():
 			# there are a few ways that tags are generated
 			# 1) first 3 letters of locality
 			name = teamName.split(" ")
-			for x in range(0, len(self.team_list)):
-				if (name[0][0:3].upper() == self.team_list[x][0:3]):
+			tmp_list = self.team_list
+			for x in range(0, len(tmp_list)):
+				if (name[0][0:3].upper() == tmp_list[x][0:3]):
 					print('Match Found!')
-					print('{}:{}'.format(name[0][0:3], self.team_list[x][0:3]))
-					print('{}:{}'.format(name, self.team_list[x]))
-					self.league.team_dict[teamName] = self.team_list[x]
+					print('{}:{}'.format(name[0][0:3], tmp_list[x][0:3]))
+					print('{}:{}'.format(name, tmp_list[x]))
+					self.league.team_dict[teamName] = tmp_list[x]
+					
 				elif (len(name) == 3):
-					tmp = name[0][0] + name[1][0] + name[2][0]
-					if (tmp.upper() == self.team_list[x]):
+					tmp_name = name[0][0] + name[1][0] + name[2][0]
+					if (tmp_name.upper() == tmp_list[x]):
 						print('Match Found!')
-						print('{}:{}'.format(tmp, self.team_list[x]))
-						self.league.team_dict[teamName] = self.team_list[x]
+						print('{}:{}'.format(tmp_name, tmp_list[x]))
+						self.league.team_dict[teamName] = tmp_list[x]
+						
 				else:
 					print('Not included {}'.format(teamName))
-
 
 	def getTeamURL(self, team, year):
 		# gets url for playoff stats from desired team and year
