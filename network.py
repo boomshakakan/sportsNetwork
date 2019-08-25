@@ -24,9 +24,6 @@ class neuralNetwork:
 
 def main():
 	dataset = Dataset()
-
-	team = 'GSW'
-	year = 2019
 	
 	# creates the connection to the sqlite3 database
 	dataset.createConnection()
@@ -38,8 +35,10 @@ def main():
 	dataset.populateDB()
 
 	dataset.destroyConnection()
-	print(len(dataset.league.team_dict))
+	
 	print(dataset.league.team_dict)
+	for team in dataset.league.teams:
+		print('{}->{}'.format(team.name,team.tag))
 
 if __name__ == "__main__":
 	main()

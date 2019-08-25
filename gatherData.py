@@ -39,7 +39,7 @@ class Dataset():
 		self.simple_url = "https://www.basketball-reference.com"
 		self.name_list = ["court", "opponent", "results", "teamScore", "oppScore", "streak", "links"]
 		self.team_list = ["GSW", "TOR", "CHI", "DEN", "ATL", "BOS", "CHO", "CLE", "DAL", "DET", "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", \
-		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHO", "POR", "SAS", "SAC", "WAS", "DAL", "UTA"]
+		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHO", "POR", "SAS", "SAC", "WAS", "OKC", "UTA"]
 		self.league = League(self.team_list)
 
 		self.lists, self.links, self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.teams \
@@ -69,11 +69,10 @@ class Dataset():
 		if self.conn:
 			cur = self.conn.cursor()
 			
-			for x in range(0, len(self.league.teams)):
+			for team in self.league.teams:
 
 				# we want to create roster using self.lastgamelink only for most recent year 
-	
-				self.getTeamURL(self.league.teams[x].tag, 2019)
+				self.getTeamURL(team.tag, 2019)
 				self.getHTML(self.team_url)
 				self.processTeamHTML()
 				self.gatherStats()
@@ -84,33 +83,37 @@ class Dataset():
 			self.conn.commit()
 
 	def getTag(self, teamName):
-		# given full team name (locality Name) create dictionary to team's tag
+		# given full team name return team's tag OR create dictionary entry for relation
+	
 		if teamName in self.league.team_dict:
 			print('name already in dictionary')
 			print('Tag is: {}'.format(self.league.team_dict[teamName]))
-			return self.league.team_dict[teamName]
+			
 		else:
 			# here we observe the teamName to find matches to tags and populate dictionary to correspond
-			# there are a few ways that tags are generated
-			# 1) first 3 letters of locality
+			# a messy reverse engineer to relate all team names to tags
 			name = teamName.split(" ")
-			tmp_list = self.team_list
-			for x in range(0, len(tmp_list)):
-				if (name[0][0:3].upper() == tmp_list[x][0:3]):
-					print('Match Found!')
-					print('{}:{}'.format(name[0][0:3], tmp_list[x][0:3]))
-					print('{}:{}'.format(name, tmp_list[x]))
-					self.league.team_dict[teamName] = tmp_list[x]
+			name_length = len(name)
+			for team in self.league.teams:
+				if (name[0][0:3].upper() == team.tag):
+					self.league.team_dict[teamName] = team.tag
 					
-				elif (len(name) == 3):
+				elif (name_length == 3):
 					tmp_name = name[0][0] + name[1][0] + name[2][0]
-					if (tmp_name.upper() == tmp_list[x]):
-						print('Match Found!')
-						print('{}:{}'.format(tmp_name, tmp_list[x]))
-						self.league.team_dict[teamName] = tmp_list[x]
+					if (tmp_name.upper() == team.tag):
+						self.league.team_dict[teamName] = team.tag
 						
+					elif (name[0] == 'Oklahoma'):
+						self.league.team_dict[teamName] = 'OKC'
+
 				else:
-					print('Not included {}'.format(teamName))
+					if (name_length == 2):
+						tmp_name = name[0][0] + name[1][0] + name[1][1]
+						if (tmp_name.upper() == team.tag):
+							self.league.team_dict[teamName] = team.tag
+							
+						elif (name[0] == 'Brooklyn'):
+							self.league.team_dict[teamName] = 'BRK'
 
 	def getTeamURL(self, team, year):
 		# gets url for playoff stats from desired team and year
@@ -136,7 +139,6 @@ class Dataset():
 		day = date[6:8]
 		date_stamp = year + '-' + month + '-' + day
 		print(date_stamp)
-		return date_stamp
 
 	def processTeamHTML(self):
 		# parses html from team page and extracts useful data into lists
@@ -197,12 +199,14 @@ class Dataset():
 			advStat = [th.getText() for th in table_headers[1].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
 			self.stats.append(advStat[1:])
 			# print(self.stats)
-			print("basic stats: {}".format(len(basicStat)))
-			print("adv stats: {}".format(len(advStat)))
+			# print("basic stats: {}".format(len(basicStat)))
+			# print("adv stats: {}".format(len(advStat)))
 
 	def processBoxHTML(self):
 		# parses html from box score page and pulls useful data 
+		# pull box score stats for a single game link
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
+		
 		if (self.links and self.stats):
 			for idx in range(0,1):
 				self.getGameURL(self.links[idx])
@@ -213,8 +217,9 @@ class Dataset():
 				# find name of teams
 				teams = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
 				print(teams)
-				for x in range(0,len(teams)):
-					self.getTag(teams[x])
+				for name in teams:
+					self.getTag(name)
+				
 
 				table_headers = self.soup.findAll('thead')
 				table_body = self.soup.findAll('tbody')
@@ -228,9 +233,6 @@ class Dataset():
 							# print("Name: {}".format(name))
 							row_data = [td.getText() for td in row.findAll('td')]
 							# print(row_data)
-
-
-
 
 	def process10Years(self):
 		# uses class methods to obtain team data from past 10 years
@@ -247,23 +249,4 @@ class Dataset():
 	def clearLists(self):
 		# makes all lists empty (never try to save or delete after using clearLists)
 		self.lists, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list = ([] for i in range(7))
-
-	def save(self):
-		# loops over contents of lists and saves to text file
-		if self.lists != []:
-			for x in range(0,len(self.name_list)):
-				fileName = "{}.txt".format(self.name_list[x])
-				with open(fileName, 'w') as writeFile:
-					for item in self.lists[x]:
-						writeFile.write("%s\n" % item)
-
-	def delete(self):
-		# deletes the .txt files generated by save method (only works after execution of save)
-		if self.lists != []:
-			for y in range(0,len(self.name_list)):
-				fileName = "{}.txt".format(self.name_list[y])
-				os.remove(fileName)
-
-	def deleteDB(self):
-		os.remove('bball_data.db')
 
