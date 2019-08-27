@@ -1,6 +1,7 @@
 from gatherData import Dataset, League, Team, Game
 import numpy as np
 
+# this is import of simple network implemented in the past, just a framework for understanding not final implementation
 class neuralNetwork:
 
 	def __init__(self):
@@ -27,18 +28,14 @@ def main():
 	
 	# creates the connection to the sqlite3 database
 	dataset.createConnection()
-	# dataset.getTeamURL(team, year)
-	# dataset.getHTML(dataset.team_url)
-	# process the HTML from passed url
-	# dataset.processTeamHTML()
-	# dataset.gatherStats()
 	dataset.populateDB()
-
 	dataset.destroyConnection()
-	
 	print(dataset.league.team_dict)
+
 	for team in dataset.league.teams:
-		print('{}->{}'.format(team.name,team.tag))
+		print('{}: '.format(team.tag))
+		team.showGames()
+	
 
 if __name__ == "__main__":
 	main()

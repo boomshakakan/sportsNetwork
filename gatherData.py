@@ -1,5 +1,7 @@
-'''This program is intended to gather pertinent data from "basketball-reference.com"
-and store it for later use in the game prediction network'''
+'''
+This program is intended to gather pertinent data from "basketball-reference.com"
+and store it for later use in the game prediction network
+'''
 
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
@@ -14,15 +16,30 @@ import os
 class Game():
 	def __init__(self, date):
 		self.date = date
-		print('Game Initialized')
+		print('Game Initialized with date: {}'.format(self.date))
 
-# team object holds onto a list of games 
+# team object holds a list of games
 class Team(Game):
 	def __init__(self, tag):
 		self.games = []
 		self.roster = []
 		self.tag = tag
+		self.team_built = False
 		print('Team Initialized: '+ self.tag)
+
+	def addGame(self, date):
+		make_add = True
+		for game in self.games:
+			if (date == game.date):
+				make_add = False
+		
+			if (make_add):
+				print('Adding game date to list of games')
+				self.games.append(Game(date))
+
+	def showGames(self):
+		for game in self.games:
+			print(game.date)
 
 class League(Team, Game):
 	def __init__(self, team_list):
@@ -35,9 +52,8 @@ class League(Team, Game):
 
 class Dataset():
 	def __init__(self):
-		# define names for teams a and initialize empty list containers
+		# define tags for teams and initialize empty list containers
 		self.simple_url = "https://www.basketball-reference.com"
-		self.name_list = ["court", "opponent", "results", "teamScore", "oppScore", "streak", "links"]
 		self.team_list = ["GSW", "TOR", "CHI", "DEN", "ATL", "BOS", "CHO", "CLE", "DAL", "DET", "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", \
 		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHO", "POR", "SAS", "SAC", "WAS", "OKC", "UTA"]
 		self.league = League(self.team_list)
@@ -48,7 +64,7 @@ class Dataset():
 	def createConnection(self):
 		# creates the sqlite3 database connection
 		try:
-			# if no db with this name is found, one will be created
+			# if no db with this name is found, one will be created in current directory
 			self.conn = sqlite3.connect('bball_data.db')
 			print("Database connection created...")
 		except Error as e:
@@ -70,13 +86,12 @@ class Dataset():
 			cur = self.conn.cursor()
 			
 			for team in self.league.teams:
-
 				# we want to create roster using self.lastgamelink only for most recent year 
 				self.getTeamURL(team.tag, 2019)
 				self.getHTML(self.team_url)
 				self.processTeamHTML()
 				self.gatherStats()
-				self.processBoxHTML()
+				self.processBoxHTML(team)
 				print(len(self.links))
 
 			# next we add player information to player table
@@ -88,6 +103,7 @@ class Dataset():
 		if teamName in self.league.team_dict:
 			print('name already in dictionary')
 			print('Tag is: {}'.format(self.league.team_dict[teamName]))
+			return self.league.team_dict[teamName]
 			
 		else:
 			# here we observe the teamName to find matches to tags and populate dictionary to correspond
@@ -97,23 +113,26 @@ class Dataset():
 			for team in self.league.teams:
 				if (name[0][0:3].upper() == team.tag):
 					self.league.team_dict[teamName] = team.tag
+					return self.league.team_dict[teamName]
 					
 				elif (name_length == 3):
 					tmp_name = name[0][0] + name[1][0] + name[2][0]
 					if (tmp_name.upper() == team.tag):
 						self.league.team_dict[teamName] = team.tag
-						
+						return self.league.team_dict[teamName]
 					elif (name[0] == 'Oklahoma'):
 						self.league.team_dict[teamName] = 'OKC'
+						return self.league.team_dict[teamName]
 
 				else:
 					if (name_length == 2):
 						tmp_name = name[0][0] + name[1][0] + name[1][1]
 						if (tmp_name.upper() == team.tag):
 							self.league.team_dict[teamName] = team.tag
-							
+							return self.league.team_dict[teamName]
 						elif (name[0] == 'Brooklyn'):
 							self.league.team_dict[teamName] = 'BRK'
+							return self.league.team_dict[teamName]
 
 	def getTeamURL(self, team, year):
 		# gets url for playoff stats from desired team and year
@@ -130,7 +149,7 @@ class Dataset():
 		self.soup = BeautifulSoup(self.html, "html.parser")
 
 	def getDate(self, link):
-		# retrieves date from box url link using regex
+		# retrieves date from box url link using re 
 		print(link)
 		r = re.findall(r'\d+', link)
 		date = r[0]
@@ -138,7 +157,7 @@ class Dataset():
 		month = date[4:6]
 		day = date[6:8]
 		date_stamp = year + '-' + month + '-' + day
-		print(date_stamp)
+		return date_stamp
 
 	def processTeamHTML(self):
 		# parses html from team page and extracts useful data into lists
@@ -185,7 +204,7 @@ class Dataset():
 		self.lists = [self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.links]
 
 	def gatherStats(self):
-		# peek at the box score page and pull stats to make dictionaries, self.stats is an array of two lists
+		# peek at the box score page and pull stat names / self.stats contains two lists
 		if self.links != []:
 			self.stats = []
 
@@ -198,41 +217,56 @@ class Dataset():
 			self.stats.append(basicStat)
 			advStat = [th.getText() for th in table_headers[1].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
 			self.stats.append(advStat[1:])
-			# print(self.stats)
-			# print("basic stats: {}".format(len(basicStat)))
-			# print("adv stats: {}".format(len(advStat)))
+			print(self.stats)
+			print("basic stats: {}".format(len(basicStat)))
+			print("adv stats: {}".format(len(advStat)))
 
-	def processBoxHTML(self):
-		# parses html from box score page and pulls useful data 
-		# pull box score stats for a single game link
+	def processBoxHTML(self, team):
+		# parses html from box score page and pulls useful data from a single game link
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
+		# we pass in the team object so we can populate necesary fields
 		
 		if (self.links and self.stats):
+			# loop over all of team's season game links in self.links
 			for idx in range(0,1):
 				self.getGameURL(self.links[idx])
 				self.getHTML(self.game_url)
-				self.getDate(self.links[idx])
-				
+				date = self.getDate(self.links[idx])
 				body = self.soup.find('body')
-				# find name of teams
-				teams = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
-				print(teams)
-				for name in teams:
-					self.getTag(name)
-				
 
+				# find names of both teams
+				teams = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
+				# print(teams)
+
+				for name in teams:
+					tag = self.getTag(name)
+					for team in self.league.teams:
+						if (tag == team.tag):
+							# use a better asymptotic search algorithm to determine if date is in list
+							team.addGame(date)								
+		
 				table_headers = self.soup.findAll('thead')
 				table_body = self.soup.findAll('tbody')
 				# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
-
+			
+				x = 0
 				if len(table_headers) == len(table_body):
 					for table in range(0,len(table_body)):
 						rows = table_body[table].findAll('tr')
 						for row in rows:
+							# player names are pulled from header
 							name = row.find('th').getText()
-							# print("Name: {}".format(name))
+							print("Name: {}".format(name))
+							# reserves is the last value of name before the stat type changes (in below order)
+							# 1) team[0] basic stats
+							# 2) team[1] basic stats
+							# 3) team[0] adv stats
+							# 4) team[1] adv stats
+							if (name == 'Reserves'):
+								print('we need to create data containers to separate our data')
+								x = x+1
 							row_data = [td.getText() for td in row.findAll('td')]
-							# print(row_data)
+							print(row_data)
 
 	def process10Years(self):
 		# uses class methods to obtain team data from past 10 years
