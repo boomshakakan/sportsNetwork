@@ -1,5 +1,6 @@
 from gatherData import Dataset, League, Team, Game
 import numpy as np
+import datetime
 
 # this is import of simple network implemented in the past, just a framework for understanding not final implementation
 class neuralNetwork:
@@ -24,7 +25,10 @@ class neuralNetwork:
 			self.synaptic_weights += adjustments
 
 def main():
-	dataset = Dataset()
+	d = datetime.datetime.today()
+	curr_year = int(d.year)
+
+	dataset = Dataset(curr_year)
 	
 	# creates the connection to the sqlite3 database
 	dataset.createConnection()
@@ -34,8 +38,7 @@ def main():
 
 	for team in dataset.league.teams:
 		print('{}: '.format(team.tag))
-		team.showGames()
-	
+		team.show_seasons()
 
 if __name__ == "__main__":
 	main()

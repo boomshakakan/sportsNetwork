@@ -18,41 +18,54 @@ class Game():
 		self.date = date
 		print('Game Initialized with date: {}'.format(self.date))
 
-# team object holds a list of games
-class Team(Game):
-	def __init__(self, tag):
+class Season(Game):
+	# includes any possible playoff games
+	# include variables for number of games and year for season
+	def __init__(self):
 		self.games = []
-		self.roster = []
-		self.tag = tag
-		self.team_built = False
-		print('Team Initialized: '+ self.tag)
 
-	def addGame(self, date):
+	def add_game(self, date):
 		make_add = True
 		for game in self.games:
 			if (date == game.date):
 				make_add = False
 		
-			if (make_add):
-				print('Adding game date to list of games')
+		if (make_add):
+				print('game added: {}'.format(date))
 				self.games.append(Game(date))
 
-	def showGames(self):
-		for game in self.games:
-			print(game.date)
+class Team(Season, Game):	
+	def __init__(self, tag):
+		self.roster = []
+		self.seasons = []
+		self.tag = tag
+		self.roster_built = False
+		print('Team Initialized: '+ self.tag)
 
-class League(Team, Game):
+	def init_season(self):
+		# because of the way  game data is pulled need to have a season initialized for every team
+		self.seasons.append(Season())
+		print('Season initialized for {}'.format(self.tag))
+
+	def show_seasons(self):
+		for season in self.seasons:
+			for game in season.games:
+				print(game.date)
+
+class League(Team, Season, Game):
 	def __init__(self, team_list):
 		self.teams = []
 		self.player_list = []
 		self.team_dict = {}
 		for x in range(0,len(team_list)):
 			self.teams.append(Team(team_list[x]))
-		print('League Initialized')
+			self.teams[x].init_season()
+		print('League Initialized with {} teams'.format(len(team_list)))
 
 class Dataset():
-	def __init__(self):
+	def __init__(self, curr_year):
 		# define tags for teams and initialize empty list containers
+		self.curr_year = curr_year
 		self.simple_url = "https://www.basketball-reference.com"
 		self.team_list = ["GSW", "TOR", "CHI", "DEN", "ATL", "BOS", "CHO", "CLE", "DAL", "DET", "HOU", "IND", "LAC", "LAL", "MEM", "MIA", "MIL", \
 		"MIN", "BRK", "NOP", "NYK", "ORL", "PHI", "PHO", "POR", "SAS", "SAC", "WAS", "OKC", "UTA"]
@@ -81,18 +94,20 @@ class Dataset():
 	def populateDB(self):
 		# this function will take the most recent game roster of all NBA teams and fill tables in our database
 		# this is to be only called ONCE, anymore calls to this function will result in data confuscation
+		year = 2019
 		
 		if self.conn:
 			cur = self.conn.cursor()
 			
 			for team in self.league.teams:
 				# we want to create roster using self.lastgamelink only for most recent year 
-				self.getTeamURL(team.tag, 2019)
+				self.getTeamURL(team.tag, year)
 				self.getHTML(self.team_url)
-				self.processTeamHTML()
+				self.processTeamHTML(team)
+				# we process the team page and get a list of links 
 				self.gatherStats()
-				self.processBoxHTML(team)
-				print(len(self.links))
+				# only need to run gatherStats once / same stat names for every case
+				self.processBoxHTML(team, year)
 
 			# next we add player information to player table
 			self.conn.commit()
@@ -134,9 +149,9 @@ class Dataset():
 							self.league.team_dict[teamName] = 'BRK'
 							return self.league.team_dict[teamName]
 
-	def getTeamURL(self, team, year):
+	def getTeamURL(self, tag, year):
 		# gets url for playoff stats from desired team and year
-		self.team_url = "{}/teams/{}/{}_games.html".format(self.simple_url, team, year)
+		self.team_url = "{}/teams/{}/{}_games.html".format(self.simple_url, tag, year)
 
 	def getGameURL(self, address):
 		# returns url of page for individual box scores	
@@ -159,7 +174,7 @@ class Dataset():
 		date_stamp = year + '-' + month + '-' + day
 		return date_stamp
 
-	def processTeamHTML(self):
+	def processTeamHTML(self, team):
 		# parses html from team page and extracts useful data into lists
 		# use getText() to extract the text content from first row column headers
 		self.links = []
@@ -175,7 +190,7 @@ class Dataset():
 			score_link = link.get('href')
 			self.links.append(score_link)
 		# the links themselves contain information about the date so we may use these to obtain dates
-
+	
 		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
 
 		''' 
@@ -221,7 +236,7 @@ class Dataset():
 			print("basic stats: {}".format(len(basicStat)))
 			print("adv stats: {}".format(len(advStat)))
 
-	def processBoxHTML(self, team):
+	def processBoxHTML(self, team_obj, year):
 		# parses html from box score page and pulls useful data from a single game link
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
 		# we pass in the team object so we can populate necesary fields
@@ -235,16 +250,20 @@ class Dataset():
 				body = self.soup.find('body')
 
 				# find names of both teams
-				teams = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
+				team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
 				# print(teams)
-
-				for name in teams:
+				
+				for name in team_names:
+					# get tag from team name
 					tag = self.getTag(name)
 					for team in self.league.teams:
 						if (tag == team.tag):
 							# use a better asymptotic search algorithm to determine if date is in list
-							team.addGame(date)								
-		
+							# BUG: TRYING TO ADD GAMES TO SEASONS OF TEAMS WHERE SEASON HAS NOT BEEN INITIALIZED
+							# how to ensure every team has a season initialized before adding game
+							print('{} seasons for {}'.format(len(team.seasons), team.tag))
+							team.seasons[len(team.seasons)-1].add_game(date)
+									
 				table_headers = self.soup.findAll('thead')
 				table_body = self.soup.findAll('tbody')
 				# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
