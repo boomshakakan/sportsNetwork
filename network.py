@@ -29,11 +29,12 @@ def main():
 	curr_year = int(d.year)
 
 	dataset = Dataset(curr_year)
-	
 	# creates the connection to the sqlite3 database
-	dataset.createConnection()
-	dataset.populateDB()
-	dataset.destroyConnection()
+	dataset.create_connection()
+	# get stat names and put them into dataset.stats
+	dataset.get_statnames()
+	dataset.populate_DB()
+	dataset.destroy_connection()
 	print(dataset.league.team_dict)
 
 	for team in dataset.league.teams:

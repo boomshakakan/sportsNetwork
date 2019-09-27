@@ -13,6 +13,11 @@ import re
 import os
 
 # game object holds date of game
+class Player():
+	def __init__(self, name):
+		self.name = name
+		self.team = "N/A"
+		
 class Game():
 	def __init__(self, date):
 		self.date = date
@@ -23,6 +28,9 @@ class Season(Game):
 	# include variables for number of games and year for season
 	def __init__(self):
 		self.games = []
+
+	def set_numGames(self, num_games):
+		self.num_games = num_games
 
 	def add_game(self, date):
 		make_add = True
@@ -74,7 +82,7 @@ class Dataset():
 		self.lists, self.links, self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.teams \
 		= ([] for i in range(10))
 
-	def createConnection(self):
+	def create_connection(self):
 		# creates the sqlite3 database connection
 		try:
 			# if no db with this name is found, one will be created in current directory
@@ -83,7 +91,7 @@ class Dataset():
 		except Error as e:
 			print(e)
 
-	def destroyConnection(self):
+	def destroy_connection(self):
 		# closes the sqlite db connection
 		if self.conn:
 			self.conn.close()
@@ -91,7 +99,7 @@ class Dataset():
 		else:
 			print("No database connection found...")
 
-	def populateDB(self):
+	def populate_DB(self):
 		# this function will take the most recent game roster of all NBA teams and fill tables in our database
 		# this is to be only called ONCE, anymore calls to this function will result in data confuscation
 		year = 2019
@@ -99,20 +107,32 @@ class Dataset():
 		if self.conn:
 			cur = self.conn.cursor()
 			
+			# we will inevitably loop through years in order to pull data
 			for team in self.league.teams:
 				# we want to create roster using self.lastgamelink only for most recent year 
-				self.getTeamURL(team.tag, year)
-				self.getHTML(self.team_url)
-				self.processTeamHTML(team)
+				self.get_TeamURL(team.tag, year)
+				self.get_HTML(self.team_url)
+				self.process_TeamHTML(team)
 				# we process the team page and get a list of links 
-				self.gatherStats()
-				# only need to run gatherStats once / same stat names for every case
-				self.processBoxHTML(team, year)
+				if year == self.curr_year:
+					# run function that will pull the roster from the first roster 
+					self.get_roster(team)
+
+				# self.process_BoxHTML(team, year)
 
 			# next we add player information to player table
 			self.conn.commit()
 
-	def getTag(self, teamName):
+	def get_statnames(self):
+		# we pick an arbitrary team and use it to find names of stats
+		tmp_team = self.league.teams[0]
+
+		self.get_TeamURL(tmp_team.tag, self.curr_year)
+		self.get_HTML(self.team_url)
+		self.process_TeamHTML(tmp_team)
+		self.gather_stats()
+
+	def get_tag(self, teamName):
 		# given full team name return team's tag OR create dictionary entry for relation
 	
 		if teamName in self.league.team_dict:
@@ -149,21 +169,21 @@ class Dataset():
 							self.league.team_dict[teamName] = 'BRK'
 							return self.league.team_dict[teamName]
 
-	def getTeamURL(self, tag, year):
+	def get_TeamURL(self, tag, year):
 		# gets url for playoff stats from desired team and year
 		self.team_url = "{}/teams/{}/{}_games.html".format(self.simple_url, tag, year)
 
-	def getGameURL(self, address):
+	def get_GameURL(self, address):
 		# returns url of page for individual box scores	
 		self.game_url = self.simple_url + address
 
-	def getHTML(self, url):
+	def get_HTML(self, url):
 		# obtains parsed HTML from URL
 		print("Getting HTML from URL:{}".format(url))
 		self.html = urlopen(url)
 		self.soup = BeautifulSoup(self.html, "html.parser")
 
-	def getDate(self, link):
+	def get_date(self, link):
 		# retrieves date from box url link using re 
 		print(link)
 		r = re.findall(r'\d+', link)
@@ -174,7 +194,7 @@ class Dataset():
 		date_stamp = year + '-' + month + '-' + day
 		return date_stamp
 
-	def processTeamHTML(self, team):
+	def process_TeamHTML(self, team):
 		# parses html from team page and extracts useful data into lists
 		# use getText() to extract the text content from first row column headers
 		self.links = []
@@ -186,11 +206,12 @@ class Dataset():
 		self.lastgameLink = (self.soup.find('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})).get('href')
 		
 		for link in self.soup.findAll('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})[1:]:
-	
 			score_link = link.get('href')
 			self.links.append(score_link)
-		# the links themselves contain information about the date so we may use these to obtain dates
-	
+
+		# use the list of links to determine number of games for season
+		team.seasons[len(team.seasons)-1].set_numGames(len(self.links))
+
 		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
 
 		''' 
@@ -218,25 +239,35 @@ class Dataset():
 		# make list of all lists
 		self.lists = [self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.links]
 
-	def gatherStats(self):
+	def gather_stats(self):
 		# peek at the box score page and pull stat names / self.stats contains two lists
 		if self.links != []:
 			self.stats = []
 
-			self.getGameURL(self.links[0])
-			self.getHTML(self.game_url)
+			self.get_GameURL(self.links[0])
+			self.get_HTML(self.game_url)
 
 			table_headers = self.soup.findAll('thead')
 			# find Basic Box Score Stats
 			basicStat = [th.getText() for th in table_headers[0].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
-			self.stats.append(basicStat)
 			advStat = [th.getText() for th in table_headers[1].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
-			self.stats.append(advStat[1:])
+			self.stats = basicStat + advStat[1:]
 			print(self.stats)
-			print("basic stats: {}".format(len(basicStat)))
-			print("adv stats: {}".format(len(advStat)))
+			# print("basic stats: {}".format(len(basicStat)))
+			# print("adv stats: {}".format(len(advStat)))
 
-	def processBoxHTML(self, team_obj, year):
+	def get_roster(self, team):
+		# process most recent game link and use to generate team roster
+		print("Pulling team roster for {}".format(team.tag))
+		recent_game = self.links[len(self.links)-1]
+		print(recent_game)
+		self.get_GameURL(recent_game)
+		self.get_HTML(self.game_url)
+
+
+
+
+	def process_BoxHTML(self, team_obj, year):
 		# parses html from box score page and pulls useful data from a single game link
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
 		# we pass in the team object so we can populate necesary fields
@@ -244,9 +275,9 @@ class Dataset():
 		if (self.links and self.stats):
 			# loop over all of team's season game links in self.links
 			for idx in range(0,1):
-				self.getGameURL(self.links[idx])
-				self.getHTML(self.game_url)
-				date = self.getDate(self.links[idx])
+				self.get_GameURL(self.links[idx])
+				self.get_HTML(self.game_url)
+				date = self.get_date(self.links[idx])
 				body = self.soup.find('body')
 
 				# find names of both teams
@@ -255,7 +286,7 @@ class Dataset():
 				
 				for name in team_names:
 					# get tag from team name
-					tag = self.getTag(name)
+					tag = self.get_tag(name)
 					for team in self.league.teams:
 						if (tag == team.tag):
 							# use a better asymptotic search algorithm to determine if date is in list
@@ -268,6 +299,8 @@ class Dataset():
 				table_body = self.soup.findAll('tbody')
 				# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
 			
+				# HOW CAN WE PULL ROSTERS FROM THIS DATA DISCRIMINATELY
+				# lets arrange this data into a container for each individual game and pull from that
 				x = 0
 				if len(table_headers) == len(table_body):
 					for table in range(0,len(table_body)):

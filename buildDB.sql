@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS game_stats (
 	FOREIGN KEY (game_ID) REFERENCES games(game_ID)
 	FOREIGN KEY (player_ID) REFERENCES players(player_ID)
 	);
+
 CREATE TABLE IF NOT EXISTS adv_stats (
 	game_ID INTEGER,
-	player_ID INTEGER,
-
-)
+	player_ID INTEGER
+	);
