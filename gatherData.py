@@ -14,14 +14,19 @@ import os
 
 # game object holds date of game
 class Player():
-	def __init__(self, name):
+	def __init__(self, name, team):
 		self.name = name
-		self.team = "N/A"
+		self.team = team
 		
 class Game():
 	def __init__(self, date):
 		self.date = date
+		self.roster = []
 		print('Game Initialized with date: {}'.format(self.date))
+
+	def check_roster(self):
+		for player in self.roster:
+			print(player)
 
 class Season(Game):
 	# includes any possible playoff games
@@ -35,7 +40,7 @@ class Season(Game):
 	def add_game(self, date):
 		make_add = True
 		for game in self.games:
-			if (date == game.date):
+			if date == game.date:
 				make_add = False
 		
 		if (make_add):
@@ -46,6 +51,7 @@ class Team(Season, Game):
 	def __init__(self, tag):
 		self.roster = []
 		self.seasons = []
+		self.season_idx = 0
 		self.tag = tag
 		self.roster_built = False
 		print('Team Initialized: '+ self.tag)
@@ -53,6 +59,7 @@ class Team(Season, Game):
 	def init_season(self):
 		# because of the way  game data is pulled need to have a season initialized for every team
 		self.seasons.append(Season())
+		self.season_idx += 1
 		print('Season initialized for {}'.format(self.tag))
 
 	def show_seasons(self):
@@ -114,11 +121,11 @@ class Dataset():
 				self.get_HTML(self.team_url)
 				self.process_TeamHTML(team)
 				# we process the team page and get a list of links 
-				if year == self.curr_year:
-					# run function that will pull the roster from the first roster 
+				if team.roster_built == False:
 					self.get_roster(team)
+					# must use some variant of process_Box to build team rosters
 
-				# self.process_BoxHTML(team, year)
+				self.process_BoxHTML(team, year)
 
 			# next we add player information to player table
 			self.conn.commit()
@@ -134,12 +141,14 @@ class Dataset():
 
 	def get_tag(self, teamName):
 		# given full team name return team's tag OR create dictionary entry for relation
+		# IF GET
 	
 		if teamName in self.league.team_dict:
 			print('name already in dictionary')
 			print('Tag is: {}'.format(self.league.team_dict[teamName]))
 			return self.league.team_dict[teamName]
-			
+
+		# ELSE SET & GET
 		else:
 			# here we observe the teamName to find matches to tags and populate dictionary to correspond
 			# a messy reverse engineer to relate all team names to tags
@@ -210,7 +219,7 @@ class Dataset():
 			self.links.append(score_link)
 
 		# use the list of links to determine number of games for season
-		team.seasons[len(team.seasons)-1].set_numGames(len(self.links))
+		team.seasons[team.season_idx-1].set_numGames(len(self.links))
 
 		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
 
@@ -264,15 +273,46 @@ class Dataset():
 		self.get_GameURL(recent_game)
 		self.get_HTML(self.game_url)
 
+		body = self.soup.find('body')
+		team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
+		
+		for name in team_names:
+			tag = self.get_tag(name)
+			print('{} seasons for {}'.format(team.season_idx, team.tag))
+									
+		table_headers = self.soup.findAll('thead')
+		table_body = self.soup.findAll('tbody')
+		# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
+		stat_data = []
+		x = 0
+		for table in table_body:
+			rows = table_body[table].findAll('tr')
+			players = []
+			# containers for each team's players and stats
+			for row in rows:
+				# player names are pulled from header
+				name = row.find('th').getText()
+				print("Name: {}".format(name))
+				# reserves is the last value of name before the stat type changes (in below order)
+				# 1) team[0] basic stats
+				# 2) team[1] basic stats
+				# 3) team[0] adv stats
+				# 4) team[1] adv stats
+				if (name == 'Reserves'):
+					print('we need to create data containers to separate our data')
+					x += 1
+				row_data = [td.getText() for td in row.findAll('td')]
+				print(row_data)
 
 
 
-	def process_BoxHTML(self, team_obj, year):
+	def process_BoxHTML(self, team, year):
 		# parses html from box score page and pulls useful data from a single game link
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
 		# we pass in the team object so we can populate necesary fields
 		
 		if (self.links and self.stats):
+
 			# loop over all of team's season game links in self.links
 			for idx in range(0,1):
 				self.get_GameURL(self.links[idx])
@@ -282,29 +322,31 @@ class Dataset():
 
 				# find names of both teams
 				team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
-				# print(teams)
 				
 				for name in team_names:
 					# get tag from team name
 					tag = self.get_tag(name)
 					for team in self.league.teams:
-						if (tag == team.tag):
+						if tag == team.tag:
 							# use a better asymptotic search algorithm to determine if date is in list
 							# BUG: TRYING TO ADD GAMES TO SEASONS OF TEAMS WHERE SEASON HAS NOT BEEN INITIALIZED
 							# how to ensure every team has a season initialized before adding game
-							print('{} seasons for {}'.format(len(team.seasons), team.tag))
-							team.seasons[len(team.seasons)-1].add_game(date)
+							print('{} seasons for {}'.format(team.season_idx, team.tag))
+							team.seasons[team.season_idx-1].add_game(date)
 									
 				table_headers = self.soup.findAll('thead')
 				table_body = self.soup.findAll('tbody')
 				# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
 			
 				# HOW CAN WE PULL ROSTERS FROM THIS DATA DISCRIMINATELY
+				stat_data = []
 				# lets arrange this data into a container for each individual game and pull from that
 				x = 0
 				if len(table_headers) == len(table_body):
 					for table in range(0,len(table_body)):
 						rows = table_body[table].findAll('tr')
+						players = []
+						# containers for each team's players and stats
 						for row in rows:
 							# player names are pulled from header
 							name = row.find('th').getText()
@@ -316,21 +358,9 @@ class Dataset():
 							# 4) team[1] adv stats
 							if (name == 'Reserves'):
 								print('we need to create data containers to separate our data')
-								x = x+1
+								x += 1
 							row_data = [td.getText() for td in row.findAll('td')]
 							print(row_data)
-
-	def process10Years(self):
-		# uses class methods to obtain team data from past 10 years
-
-		d = datetime.datetime.today()
-		currYear = int(d.year)
-		# collects data from the past decade into containers
-		for x in range(0,10):
-
-			self.getTeamURL(currYear - x)
-			self.getHTML(self.team_url)
-			self.processTeamHTML()
 
 	def clearLists(self):
 		# makes all lists empty (never try to save or delete after using clearLists)
