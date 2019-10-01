@@ -17,11 +17,11 @@ class Player():
 	def __init__(self, name, team):
 		self.name = name
 		self.team = team
+		print("Player: {} created for {}".format(name, team))
 		
 class Game():
 	def __init__(self, date):
 		self.date = date
-		self.roster = []
 		print('Game Initialized with date: {}'.format(self.date))
 
 	def check_roster(self):
@@ -115,17 +115,21 @@ class Dataset():
 			cur = self.conn.cursor()
 			
 			# we will inevitably loop through years in order to pull data
-			for team in self.league.teams:
+			for idx, team in enumerate(self.league.teams):
+				print(idx)
 				# we want to create roster using self.lastgamelink only for most recent year 
 				self.get_TeamURL(team.tag, year)
 				self.get_HTML(self.team_url)
-				self.process_TeamHTML(team)
+				self.process_TeamHTML(team, idx)
 				# we process the team page and get a list of links 
-				if team.roster_built == False:
-					self.get_roster(team)
+				
+
+				if year == self.curr_year and team.roster_built == False:
+					self.get_roster(team, 1)
 					# must use some variant of process_Box to build team rosters
 
-				self.process_BoxHTML(team, year)
+				# self.process_BoxHTML(team, year)
+				
 
 			# next we add player information to player table
 			self.conn.commit()
@@ -265,8 +269,12 @@ class Dataset():
 			# print("basic stats: {}".format(len(basicStat)))
 			# print("adv stats: {}".format(len(advStat)))
 
-	def get_roster(self, team):
+	def get_roster(self, team, team_idx):
 		# process most recent game link and use to generate team roster
+		# we do not know if the team passed in will be away or home so we match that as we go
+		# list_idx will be the index of the team object in league.teams
+		tag_list, players, away_roster, home_roster, away_stats, home_stats = ([] for i in range(6))
+
 		print("Pulling team roster for {}".format(team.tag))
 		recent_game = self.links[len(self.links)-1]
 		print(recent_game)
@@ -275,32 +283,74 @@ class Dataset():
 
 		body = self.soup.find('body')
 		team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
-		
+
 		for name in team_names:
 			tag = self.get_tag(name)
-			print('{} seasons for {}'.format(team.season_idx, team.tag))
+			tag_list.append(tag)
+			
+			if team.tag == tag:
+				self.league.teams[team_idx].roster_built = True
+				print('{} seasons for {}'.format(team.season_idx, team.tag))
+
+			else:
+				# we could potentially use team_dict if all seasons are pre-processed, not yet
+				for x in range(0, len(self.league.teams)):
+					if self.league.teams[x].tag == tag:
+						second_idx = x
+						self.league.teams[x].roster_built = True
+						print('{} seasons for {}'.format(self.league.teams[x].season_idx, self.league.teams[x].tag))
 									
+		print(team_idx)
 		table_headers = self.soup.findAll('thead')
 		table_body = self.soup.findAll('tbody')
 		# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
 		stat_data = []
+		# x iterates for each table contents
 		x = 0
-		for table in table_body:
+		players = [away_roster, home_roster]
+		player_stats = [away_stats, home_stats]
+		for table in range(0,len(table_body)):
 			rows = table_body[table].findAll('tr')
-			players = []
+			
 			# containers for each team's players and stats
 			for row in rows:
-				# player names are pulled from header
+				# player names are pulled from header and stats skimmed from table
 				name = row.find('th').getText()
-				print("Name: {}".format(name))
-				# reserves is the last value of name before the stat type changes (in below order)
-				# 1) team[0] basic stats
-				# 2) team[1] basic stats
-				# 3) team[0] adv stats
-				# 4) team[1] adv stats
-				if (name == 'Reserves'):
-					print('we need to create data containers to separate our data')
+				
+				if name == 'Reserves':
+					print(x)
 					x += 1
+
+				else:
+					row_data = [td.getText() for td in row.findAll('td')]
+					print("Name: {}\nStats: {}".format(name, row_data))
+					if (x < 2):
+						bit = x%2
+						# x % 2 == 0 away team
+						players[bit].append(name)
+						player_stats[bit].append(row_data)
+						player = Player(name, tag_list[bit])
+
+						if name not in self.league.player_list:
+							self.league.player_list.append(name)
+						
+						if team.tag == tag_list[bit]:
+							self.league.teams[team_idx].roster.append(player)
+						else:
+							if not self.league.teams[second_idx].roster_built:
+								self.league.teams[second_idx].roster.append(player)
+						
+				#if (x % 2 == 0):
+					# away team stats
+				
+				# reserves is the last value of name before the stat type changes (in below order)
+				# 0) team[0] (away team) basic stats
+				# 1) team[1] (home team) basic stats
+				# 2) team[0] (away team) adv stats
+				# 3) team[1] (home team) adv stats
+
+
+
 				row_data = [td.getText() for td in row.findAll('td')]
 				print(row_data)
 
