@@ -40,7 +40,7 @@ def main():
 	for team in dataset.league.teams:
 		print('{}: '.format(team.tag))
 		team.show_seasons()
-		print(team.roster)
+		team.show_roster()
 
 if __name__ == "__main__":
 	main()
