@@ -38,7 +38,6 @@ def main():
 	print(dataset.league.team_dict)
 
 	for team in dataset.league.teams:
-		print('{}: '.format(team.tag))
 		team.show_seasons()
 		team.show_roster()
 

@@ -48,12 +48,12 @@ class Season(Game):
 				self.games.append(Game(date))
 
 class Team(Season, Game):	
-	def __init__(self, tag, list_idx):
+	def __init__(self, tag):
 		self.roster = []
 		self.seasons = []
+		self.idx = -1
 		self.season_idx = 0
 		self.tag = tag
-		self.idx = list_idx
 		self.roster_built = False
 		print('Team Initialized: '+ self.tag)
 
@@ -69,7 +69,7 @@ class Team(Season, Game):
 				print(game.date)
 
 	def show_roster(self):
-		print("Roster for {}".format(self.tag))
+		print("Roster for {}:".format(self.tag))
 		for player in self.roster:
 			print(player)
 
@@ -79,7 +79,8 @@ class League(Team, Season, Game):
 		self.player_list = []
 		self.team_dict = {}
 		for x in range(0,len(team_list)):
-			self.teams.append(Team(team_list[x], x))
+			self.teams.append(Team(team_list[x]))
+			self.teams[x].idx = x
 			self.teams[x].init_season()
 		print('League Initialized with {} teams'.format(len(team_list)))
 
@@ -122,7 +123,7 @@ class Dataset():
 			
 			# we will inevitably loop through years in order to pull data
 			for idx, team in enumerate(self.league.teams):
-				print(idx)
+				print("{} : {}".format(team.tag, team.idx))
 				# we want to create roster using self.lastgamelink only for most recent year 
 				self.get_TeamURL(team.tag, year)
 				self.get_HTML(self.team_url)
@@ -131,7 +132,7 @@ class Dataset():
 				
 
 				if year == self.curr_year and team.roster_built == False:
-					self.get_roster(team, idx)
+					self.get_roster(team)
 					# must use some variant of process_Box to build team rosters
 
 				# self.process_BoxHTML(team, year)
@@ -274,7 +275,7 @@ class Dataset():
 			# print("basic stats: {}".format(len(basicStat)))
 			# print("adv stats: {}".format(len(advStat)))
 
-	def get_roster(self, team, team_idx):
+	def get_roster(self, team):
 		# process most recent game link and use to generate team roster
 		# we do not know if the team passed in will be away or home so we match that as we go
 		# list_idx will be the index of the team object in league.teams
@@ -290,15 +291,22 @@ class Dataset():
 		team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
 		team_list = [] # list of team objects
 
+		flag = False
+
 		for name in team_names:
 			tag = self.get_tag(name)
 			tag_list.append(tag)
+
+			if flag == False:
+				flag = True
+				print("Away Team: {}".format(tag))
+			else:
+				print("Home Team: {}".format(tag))
 			
 			if team.tag == tag:
-				self.league.teams[team_idx].roster_built = True
+				self.league.teams[team.idx].roster_built = True
 				print('{} seasons for {}'.format(team.season_idx, team.tag))
 				team_list.append(team)
-
 			else:
 				# we could potentially use team_dict if all seasons are pre-processed, not yet
 				for x in range(0, len(self.league.teams)):
@@ -312,53 +320,66 @@ class Dataset():
 		table_body = self.soup.findAll('tbody')
 		# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
 		# x iterates for each html object
-		x = 0
+		y = 0
+		# length of table_body is 16, each player and 'Reserves'
+
 		for table in range(0,len(table_body)):
 			rows = table_body[table].findAll('tr')
-			
+			print(len(rows))
 			# containers for each team's players and stats
 			for row in rows:
+				
 				# player names are pulled from header and stats skimmed from table
 				name = row.find('th').getText()
 				
-				if name == 'Reserves':
-					print(x)
-					x += 1
+				# if name == 'Reserves':
+				#	print(x)
+				#	x += 1
 
+				# y = 0 basic stats
+				# y = 
+
+				row_data = [td.getText() for td in row.findAll('td')]
+				
+				print("Name: {}\nStats: {}".format(name, row_data))
+				
+				bit = y % 2
+				print("{} -> {}".format(y, bit))
+				player = Player(name, team_list[bit].tag)
+
+				# BUG the name of the player must be matched to their stats
+				# right now stats are simply appended to list but they are not guaranteed to be in correct order
+				# OPTION: player lists for game stats?
+				if name != 'Reserves':
+
+					if y == 0:
+						self.league.teams[team_list[0].idx].roster.append(name)
+						away_roster.append(name)
+						away_stats.append(row_data)
+					elif y == 7:
+						away_adv.append(row_data)
+					elif y == 8:
+						self.league.teams[team_list[1].idx].roster.append(name)
+						home_roster.append(name)
+						home_stats.append(row_data)
+					elif y == 15:
+						home_adv.append(row_data)
+					else: 
+						break
 				else:
-					row_data = [td.getText() for td in row.findAll('td')]
-					print("Name: {}\nStats: {}".format(name, row_data))
-					
-					bit = x % 2
-					player = Player(name, team_list[bit].tag)
+					break
 
-					if x < 2:
-						if bit == 0:
-							self.league.teams[team_list[bit].idx].roster.append(name)
-							away_roster.append(name)
-							away_stats.append(row_data)
-						else:
-							self.league.teams[team_list[bit].idx].roster.append(name)
-							home_roster.append(name)
-							home_stats.append(row_data)
 
-					else:
-						if bit == 0:
-							away_adv.append(row_data)
-						else:
-							home_adv.append(row_data)
-
-					if name not in self.league.player_list:
-						self.league.player_list.append(player)
+				if name not in self.league.player_list:
+					self.league.player_list.append(name)
+			
+			y += 1
 				
 				# reserves is the last value of name before the stat type changes (in below order)
 				# 0) team[0] (away team) basic stats
-				# 1) team[1] (home team) basic stats
-				# 2) team[0] (away team) adv stats
+				# 1) team[0] (away team) adv stats
+				# 2) team[1] (home team) basic stats
 				# 3) team[1] (home team) adv stats
-
-				row_data = [td.getText() for td in row.findAll('td')]
-				print(row_data)
 
 	def process_BoxHTML(self, team, year):
 		# parses html from box score page and pulls useful data from a single game link
