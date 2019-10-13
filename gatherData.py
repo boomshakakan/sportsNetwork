@@ -322,53 +322,54 @@ class Dataset():
 		# x iterates for each html object
 		y = 0
 		# length of table_body is 16, each player and 'Reserves'
+		print(len(table_body))
+
+		# we want to keep the following indeces of table_body
+
 
 		for table in range(0,len(table_body)):
+			print("table index: {}".format(table))
 			rows = table_body[table].findAll('tr')
-			print(len(rows))
 			# containers for each team's players and stats
-			for row in rows:
-				
+			for idx, row in enumerate(rows):
+				print("row index: {}".format(idx))
 				# player names are pulled from header and stats skimmed from table
 				name = row.find('th').getText()
-				
-				# if name == 'Reserves':
-				#	print(x)
-				#	x += 1
 
 				# y = 0 basic stats
-				# y = 
 
 				row_data = [td.getText() for td in row.findAll('td')]
 				
 				print("Name: {}\nStats: {}".format(name, row_data))
-				
-				bit = y % 2
-				print("{} -> {}".format(y, bit))
-				player = Player(name, team_list[bit].tag)
 
 				# BUG the name of the player must be matched to their stats
 				# right now stats are simply appended to list but they are not guaranteed to be in correct order
 				# OPTION: player lists for game stats?
 				if name != 'Reserves':
+					if y < 8:
+						player = Player(name, team_list[0].tag)
 
-					if y == 0:
-						self.league.teams[team_list[0].idx].roster.append(name)
-						away_roster.append(name)
-						away_stats.append(row_data)
-					elif y == 7:
-						away_adv.append(row_data)
-					elif y == 8:
-						self.league.teams[team_list[1].idx].roster.append(name)
-						home_roster.append(name)
-						home_stats.append(row_data)
-					elif y == 15:
-						home_adv.append(row_data)
-					else: 
-						break
-				else:
-					break
+						if y == 0:
+							if name not in self.league.teams[team_list[0].idx].roster:
+								self.league.teams[team_list[0].idx].roster.append(name)
+								away_roster.append(name)
+							away_stats.append(row_data)
+						elif y == 7:
+							away_adv.append(row_data)
+						else:
+							break
+					else:
+						player = Player(name, team_list[1].tag)
 
+						if y == 8:
+							if name not in self.league.teams[team_list[1].idx].roster:
+								self.league.teams[team_list[1].idx].roster.append(name)
+								home_roster.append(name)
+							home_stats.append(row_data)
+						elif y == 15:
+							home_adv.append(row_data)
+						else:
+							break
 
 				if name not in self.league.player_list:
 					self.league.player_list.append(name)
