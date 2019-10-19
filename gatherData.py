@@ -348,7 +348,6 @@ class Dataset():
 		table_body = self.soup.findAll('tbody')
 		# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
 		# length of table_body is 16, each player with stats and 'Reserves' row
-		print(len(table_body))
 		# we want to keep the following indeces of table_body containing player stats
 		# table_list = [table_body[0], table_body[7], table_body[8], table_body[15]]
 		table_list = [table_body[0], table_body[8]]
@@ -372,13 +371,13 @@ class Dataset():
 
 					if table_idx == 0:
 						# add player to specific team list and to list of total players
-						# self.league.teams[team_list[table_idx].idx].add_player(name, tag_list[table_idx])
-						self.league.teams[team_list[table_idx].idx].roster.append(name)
-						self.league.add_player(name, tag_list[table_idx])
+						if name not in self.league.teams[team_list[table_idx].idx].roster:
+							self.league.teams[team_list[table_idx].idx].roster.append(name)
+							self.league.add_player(name, tag_list[table_idx])
 					else:
-						# self.league.teams[team_list[table_idx].idx].add_player(name, tag_list[table_idx])
-						self.league.teams[team_list[table_idx].idx].roster.append(name)
-						self.league.add_player(name, tag_list[table_idx])
+						if name not in self.league.teams[team_list[table_idx].idx].roster:
+							self.league.teams[team_list[table_idx].idx].roster.append(name)
+							self.league.add_player(name, tag_list[table_idx])
 
 	def process_BoxHTML(self, team, year):
 		# parses html from box score page and pulls useful data from a single game link
