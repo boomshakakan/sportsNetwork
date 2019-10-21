@@ -144,12 +144,11 @@ class Dataset():
 			cur = self.conn.cursor()
 			
 			# we will inevitably loop through years in order to pull data
-			for idx, team in enumerate(self.league.teams):
+			for team in self.league.teams:
 				print("{} : {}".format(team.tag, team.idx))
 				
 				cur.execute("INSERT INTO teams ('name') VALUES (?)", (team.tag, ))
 
-				# we want to create roster using self.lastgamelink only for most recent year 
 				self.get_TeamURL(team.tag, year)
 				self.get_HTML(self.team_url)
 				self.process_TeamHTML(team)
@@ -157,15 +156,10 @@ class Dataset():
 
 				if year == self.curr_year and team.roster_built == False:
 					self.get_roster(team)
-					# for player in team.roster:
-						# NOTE: make this into an sql procedure for ease of use
-						# this is always how we will be inserting new players into db
-						# cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team.idx+1, player.name))
-					# must use some variant of process_Box to build team rosters
-				# self.process_BoxHTML(team, year)
 
 				for player_name in team.roster:
 					cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team.idx+1, player_name))
+				self.process_BoxHTML(team, year)
 
 			self.conn.commit()
 		else:
@@ -325,7 +319,7 @@ class Dataset():
 		for name in team_names:
 			tag = self.get_tag(name)
 			tag_list.append(tag)
-
+			# this for error checking may be omitted once verified
 			if flag == False:
 				flag = True
 				print("Away Team: {}".format(tag))
@@ -349,7 +343,6 @@ class Dataset():
 		# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
 		# length of table_body is 16, each player with stats and 'Reserves' row
 		# we want to keep the following indeces of table_body containing player stats
-		# table_list = [table_body[0], table_body[7], table_body[8], table_body[15]]
 		table_list = [table_body[0], table_body[8]]
 		# table_list[0] -> away basic stats 
 		# table_list[1] -> home basic stats
@@ -382,10 +375,7 @@ class Dataset():
 	def process_BoxHTML(self, team, year):
 		# parses html from box score page and pulls useful data from a single game link
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
-		# we pass in the team object so we can populate necesary fields
-		
 		if (self.links and self.stats):
-
 			# loop over all of team's season game links in self.links
 			for idx in range(0,1):
 				self.get_GameURL(self.links[idx])
@@ -409,29 +399,26 @@ class Dataset():
 				table_headers = self.soup.findAll('thead')
 				table_body = self.soup.findAll('tbody')
 				# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
+				table_list = [table_body[0], table_body[7], table_body[8], table_body[15]]
+				# table_list[0] -> away basic stats
+				# table_list[1] -> away adv stats 
+				# table_list[2] -> home basic stats
+				# table_list[3] -> home adv stats
 			
-				# HOW CAN WE PULL ROSTERS FROM THIS DATA DISCRIMINATELY
-				# lets arrange this data into a container for each individual game and pull from that
-				x = 0
-				if len(table_headers) == len(table_body):
-					for table in range(0,len(table_body)):
-						rows = table_body[table].findAll('tr')
-						players = []
-						# containers for each team's players and stats
-						for row in rows:
-							# player names are pulled from header
-							name = row.find('th').getText()
-							print("Name: {}".format(name))
-							# reserves is the last value of name before the stat type changes (in below order)
-							# 1) team[0] basic stats
-							# 2) team[1] basic stats
-							# 3) team[0] adv stats
-							# 4) team[1] adv stats
-							if (name == 'Reserves'):
-								print('we need to create data containers to separate our data')
-								x += 1
-							row_data = [td.getText() for td in row.findAll('td')]
-							print(row_data)
+				for table_idx in range(0,len(table_list)):
+					rows = table_body[table_idx].findAll('tr')
+					# containers for each team's players and stats
+					for row in rows:
+						# player names are pulled from header
+						name = row.find('th').getText()
+						print("Name: {}".format(name))
+						# use name to find player_id and insert game stats with corresponding id
+						if (name == 'Reserves'):
+							print('we need to create data containers to separate our data')
+						row_data = [td.getText() for td in row.findAll('td')]
+						print(row_data)
+		else:
+			print("Make sure that processTeamHTML & gatherStats have executed to obtain game links...")
 
 	def clearLists(self):
 		# makes all lists empty (never try to save or delete after using clearLists)
