@@ -145,8 +145,6 @@ class Dataset():
 			
 			# we will inevitably loop through years in order to pull data
 			for team in self.league.teams:
-				print("{} : {}".format(team.tag, team.idx))
-				
 				cur.execute("INSERT INTO teams ('name') VALUES (?)", (team.tag, ))
 
 				self.get_TeamURL(team.tag, year)
@@ -159,6 +157,7 @@ class Dataset():
 
 				for player_name in team.roster:
 					cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team.idx+1, player_name))
+				
 				self.process_BoxHTML(team, year)
 
 			self.conn.commit()
@@ -176,7 +175,6 @@ class Dataset():
 
 	def get_tag(self, teamName):
 		# given full team name return team's tag OR create dictionary entry for relation
-		# IF GET
 	
 		if teamName in self.league.team_dict:
 			print('name already in dictionary')
@@ -242,8 +240,6 @@ class Dataset():
 		# parses html from team page and extracts useful data into lists
 		# use getText() to extract the text content from first row column headers
 		self.links = []
-		table_body = self.soup.findAll('tbody')
-		headers = [th.getText() for th in self.soup.findAll('tr', limit=2)[0].findAll('th')]
 		rows = self.soup.findAll('tr')[0:]
 
 		# lastgameLink finds the link for the team's most recently played game which is how we create teams
@@ -302,9 +298,6 @@ class Dataset():
 
 	def get_roster(self, team):
 		# process most recent game link and use to generate team roster
-		# we do not know if the team passed in will be away or home so we match that as we go
-		# list_idx will be the index of the team object in league.teams
-		# team_list contains away and home team objects
 		tag_list, team_list = ([] for i in range(2))
 
 		print("Pulling team roster for {}".format(team.tag))
@@ -346,12 +339,9 @@ class Dataset():
 		table_list = [table_body[0], table_body[8]]
 		# table_list[0] -> away basic stats 
 		# table_list[1] -> home basic stats
-
 		for table_idx in range(0,len(table_list)):
-			print("table index: {}".format(table_idx))
 			rows = table_list[table_idx].findAll('tr')
 			# containers for each team's players and stats
-			print(len(rows))
 			for idx, row in enumerate(rows):
 				# player names are pulled from header and stats skimmed from table
 				name = row.find('th').getText()
@@ -395,8 +385,7 @@ class Dataset():
 							# how to ensure every team has a season initialized before adding game
 							print('{} seasons for {}'.format(team.season_idx, team.tag))
 							team.seasons[team.season_idx-1].add_game(date)
-									
-				table_headers = self.soup.findAll('thead')
+				
 				table_body = self.soup.findAll('tbody')
 				# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
 				table_list = [table_body[0], table_body[7], table_body[8], table_body[15]]
@@ -413,8 +402,6 @@ class Dataset():
 						name = row.find('th').getText()
 						print("Name: {}".format(name))
 						# use name to find player_id and insert game stats with corresponding id
-						if (name == 'Reserves'):
-							print('we need to create data containers to separate our data')
 						row_data = [td.getText() for td in row.findAll('td')]
 						print(row_data)
 		else:
