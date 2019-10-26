@@ -330,15 +330,12 @@ class Dataset():
 						team_list.append(self.league.teams[x])
 						self.league.teams[x].roster_built = True
 						print('{} seasons for {}'.format(self.league.teams[x].season_idx, self.league.teams[x].tag))
-				
-		# table_headers = self.soup.findAll('thead')
+	
 		table_body = self.soup.findAll('tbody')
-		# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
-		# length of table_body is 16, each player with stats and 'Reserves' row
-		# we want to keep the following indeces of table_body containing player stats
 		table_list = [table_body[0], table_body[8]]
 		# table_list[0] -> away basic stats 
 		# table_list[1] -> home basic stats
+
 		for table_idx in range(0,len(table_list)):
 			rows = table_list[table_idx].findAll('tr')
 			# containers for each team's players and stats
@@ -395,7 +392,7 @@ class Dataset():
 				# table_list[3] -> home adv stats
 			
 				for table_idx in range(0,len(table_list)):
-					rows = table_body[table_idx].findAll('tr')
+					rows = table_list[table_idx].findAll('tr')
 					# containers for each team's players and stats
 					for row in rows:
 						# player names are pulled from header
