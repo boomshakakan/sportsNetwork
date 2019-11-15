@@ -147,9 +147,9 @@ class Dataset():
 		if self.conn:
 			cur = self.conn.cursor()
 			
-			# we will inevitably loop through years in order to pull data
+			# we will eventually loop through years in order to pull data for a span of decades?
 			for team in self.league.teams:
-				cur.execute("INSERT INTO teams ('name') VALUES (?)", (team.tag, ))
+				# cur.execute("INSERT INTO teams ('name') VALUES (?)", (team.tag, ))
 
 				self.get_TeamURL(team.tag, year)
 				self.get_HTML(self.team_url)
@@ -162,7 +162,8 @@ class Dataset():
 				#for player_name in team.roster:
 				#	cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team.idx+1, player_name))
 				
-				self.process_BoxHTML(team, year)
+				# inside of process_box is where we will have to insert our game data to database so lets pass cursor
+				self.process_BoxHTML(cur, team, year)
 
 			self.conn.commit()
 		else:
@@ -365,7 +366,7 @@ class Dataset():
 							self.league.teams[team_list[table_idx].idx].roster.append(name)
 							self.league.add_player(name, tag_list[table_idx])
 
-	def process_BoxHTML(self, team, year):
+	def process_BoxHTML(self, cur, team, year):
 		# parses html from box score page and pulls useful data from a single game link
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
 		if (self.links and self.stats):
