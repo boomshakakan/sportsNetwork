@@ -2,7 +2,8 @@
 This program is intended to gather pertinent data from "basketball-reference.com"
 and store it for later use in the game prediction network
 '''
-
+import sys
+from termcolor import colored, cprint
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
 from sqlite3 import Error
@@ -411,11 +412,7 @@ class Dataset():
 							print("Name: {}".format(name))
 							# use name to find player_id and insert game stats with corresponding id
 							row_data = [td.getText() for td in row.findAll('td')]
-							dnp_flag = False
-
-							if row_data == "Did Not Play":
-								dnp_flag = True	
-
+								
 							# NOTE write method that parses row_data
 							# contain this into a single method for avoid code reuse
 							if table_idx < 2:
@@ -423,8 +420,8 @@ class Dataset():
 								if name != "Reserves":
 									if name not in away_roster:
 										away_roster.append(name)
-										if (dnp_flag):
-											print("Player recorded no stats")
+										if (row_data[0] == 'Did Not Play'):
+											cprint('DID NOT PLAY', 'green', 'on_red')
 										else: 
 											away_stats.append(Player(name, tag_list[0]))
 											stat_data = row_data
@@ -451,6 +448,18 @@ class Dataset():
 		else:
 			print("Make sure that processTeamHTML & gatherStats have executed to obtain game links...")
 
+	def add_boxStats(self, roster, stats, name, data, team):
+		if name != 'Reserves':
+			if name not in roster:
+				roster.append(name)
+				if (data[0] == 'Did Not Play'):
+					cprint('DID NOT PLAY', 'green', 'on_red')
+				else:
+					stats.append(Player(name, team))
+					stat_data = data
+			else:
+				stat_data = [stat_data, row_data[1:]]
+			
 	def clearLists(self):
 		# makes all lists empty (never try to save or delete after using clearLists)
 		self.lists, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list = ([] for i in range(7))
