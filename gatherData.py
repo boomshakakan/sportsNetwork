@@ -6,22 +6,56 @@ import sys
 from termcolor import colored, cprint
 from urllib.request import urlopen
 from bs4 import BeautifulSoup
-from sqlite3 import Error
+# from sqlite3 import Error
 import pandas as pd
 import sqlite3
 import datetime
 import re
 import os
 
+def find_name(roster, name):
+	# returns f if player not found in roster / O.W returns index of player in roster list
+	for idx in range(0,len(roster)):
+		if (roster[idx].name == name):
+			return True
+	return False
+
+def get_name(roster, name):
+	for idx in range(0,len(roster)):
+		if (roster[idx].name == name):
+			return idx
+	return -1
+
+class Roster():
+	def __init__(self, name)
+		self.players = []
+
+	def find_player(self, name):
+		for player in self.players:
+			if (player.name == name):
+				return True
+		return False
+
+	def get_player(self, name):
+		for ctr, player in enumerate(self.players):
+			if (player.name == name):
+				return ctr
+		return -1
+
 class Player():
 	def __init__(self, name, team):
 		self.name = name
 		self.team = team
-		print("Player: {} created for {}".format(name, team))
+		self.stats = []
+		# print("Player: {} created for {}".format(name, team))
 
-	def add_stats(self, stats):
-		self.game_stats = stats
-		
+	def add_basicStats(self, stats):
+		self.stats = stats
+
+	def add_advStats(self, stats):
+		self.stats = self.stats + stats
+		print("stats added for {}".format(self.name))
+
 class Game():
 	def __init__(self, date):
 		self.date = date
@@ -42,7 +76,6 @@ class Season(Game):
 
 	def set_numGames(self, num_games):
 		self.num_games = num_games
-		print("")
 
 	def add_game(self, date):
 		make_add = True
@@ -100,15 +133,22 @@ class League(Team, Season, Game):
 			self.teams[x].idx = x
 			self.teams[x].init_season(year)
 		print('League Initialized with {} teams'.format(len(team_list)))
+	
+	def search_player(self, name):
+		found = False
+		# for player in self.player_list:
+		#	if (player == name):
+		if player in self.player_list:
+			found = True
+		
+		return found
 
-	def add_player(self, name, tag):
-		make_add = True
-		for player in self.player_list:
-			if name == player.name:
-				make_add = False
+	def add_player(self, name):
 
-		if make_add:
-			self.player_list.append(Player(name, tag))
+		if (search_player(name) == False):
+			self.player_list.append(name)
+		else:
+			print("player already in league list")
 
 class Dataset():
 	def __init__(self, curr_year):
@@ -248,12 +288,11 @@ class Dataset():
 		self.links = []
 		rows = self.soup.findAll('tr')[0:]
 
-		# lastgameLink finds the link for the team's most recently played game which is how we create teams
+		# access to most recent game
 		self.lastgameLink = (self.soup.find('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})).get('href')
 		
 		for link in self.soup.findAll('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})[1:]:
-			score_link = link.get('href')
-			self.links.append(score_link)
+			self.links.append(link.get('href'))
 
 		# use the list of links to determine number of games for season
 		team.seasons[team.season_idx-1].set_numGames(len(self.links))
@@ -314,19 +353,11 @@ class Dataset():
 		body = self.soup.find('body')
 		team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
 
-		flag = False
+		# flag = False
 		for name in team_names:
 			tag = self.get_tag(name)
 			tag_list.append(tag)
-			# this for error checking may be omitted once verified
-			'''
-			if flag == False:
-				flag = True
-				print("Away Team: {}".format(tag))
-			else:
-				print("Home Team: {}".format(tag))
-			'''
-			
+
 			if team.tag == tag:
 				self.league.teams[team.idx].roster_built = True
 				print('{} seasons for {}'.format(team.season_idx, team.tag))
@@ -361,11 +392,11 @@ class Dataset():
 						# add player to specific team list and to list of total players
 						if name not in self.league.teams[team_list[table_idx].idx].roster:
 							self.league.teams[team_list[table_idx].idx].roster.append(name)
-							self.league.add_player(name, tag_list[table_idx])
+							self.league.add_player(name)
 					else:
 						if name not in self.league.teams[team_list[table_idx].idx].roster:
 							self.league.teams[team_list[table_idx].idx].roster.append(name)
-							self.league.add_player(name, tag_list[table_idx])
+							self.league.add_player(name)
 
 	def process_BoxHTML(self, cur, team, year):
 		# parses html from box score page and pulls useful data from a single game link
@@ -373,7 +404,7 @@ class Dataset():
 		if (self.links and self.stats):
 			# loop over all of team's season game links in self.links
 			for idx in range(0,1):
-				tag_list, home_roster, home_stats, away_roster, away_stats = ([] for i in range(5))
+				tag_list, home_roster, away_roster = ([] for i in range(3))
 
 				self.get_GameURL(self.links[idx])
 				self.get_HTML(self.game_url)
@@ -402,14 +433,13 @@ class Dataset():
 				# table_list[2] -> home basic stats
 				# table_list[3] -> home adv stats
 			
-				for table_idx in range(0,len(table_list)):
+				for table_idx in range(0, len(table_list)):
 					rows = table_list[table_idx].findAll('tr')
 					# containers for each team's players and stats
 					for idx, row in enumerate(rows):
 						name = row.find('th').getText()
-						
 						if idx != 5:
-							print("Name: {}".format(name))
+							# print("Name: {}".format(name))
 							# use name to find player_id and insert game stats with corresponding id
 							row_data = [td.getText() for td in row.findAll('td')]
 								
@@ -417,50 +447,47 @@ class Dataset():
 							# contain this into a single method for avoid code reuse
 							if table_idx < 2:
 								# away team
-								if name != "Reserves":
-									if name not in away_roster:
-										away_roster.append(name)
-										if (row_data[0] == 'Did Not Play'):
-											cprint('DID NOT PLAY', 'green', 'on_red')
-										else: 
-											away_stats.append(Player(name, tag_list[0]))
-											stat_data = row_data
-									else:
-										# add advanced stats to end of list
-										stat_data = [stat_data, row_data[1:]]
-									away_stats[len(away_roster)-1].add_stats(stat_data)
+								print("{}: {}".format(name, row_data))
+								if name != 'Reserves':
+									if (find_name(away_roster, name) == False):
+										away_roster.append(Player(name, tag_list[0]))
+								self.add_boxStats(away_roster, name, row_data, tag_list[0])
 							else:
 								# home team
-								if name != "Reserves":
-									if name not in home_roster:
-										home_roster.append(name)
-										if (dnp_flag):
-											print("Player recorded no stats")
-										else:
-											home_stats.append(Player(name, tag_list[1]))
-											stat_data = row_data
+								print("{}: {}".format(name, row_data))
+								if name != 'Reserves':
+									if (find_name(home_roster, name) == False):
+										home_roster.append(Player(name, tag_list[1]))
+										home_roster[]
+										self.add_boxStats(home_roster, name, row_data)
 									else:
-										stat_data = [stat_data, row_data[1:]]
-									home_stats[len(home_roster)-1].add_stats(stat_data)
-									print("{}.".format(idx))
-									print(row_data)
-									print(len(row_data))
+										self.add_boxStats(home_roster, name, row_data)
+							
+							# print(row_data)
+
+				print(len(away_roster))
+				for player in away_roster:
+					print("{} with stats {}".format(player.name, player.stats))
+				print(len(home_roster))
+				for player in home_roster:
+					print("{} with stats {}".format(player.name, player.stats))
+					
 		else:
 			print("Make sure that processTeamHTML & gatherStats have executed to obtain game links...")
 
-	def add_boxStats(self, roster, stats, name, data, team):
-		if name != 'Reserves':
-			if name not in roster:
-				roster.append(name)
+	def add_boxStats(self, roster, name, data):
+		if (data[0] == 'Did Not Play'):
+			cprint('DID NOT PLAY', 'green', 'on_red')
+		else:
+			roster[get_name(roster, name)].add_basicStats(data)
+		else:
 				if (data[0] == 'Did Not Play'):
-					cprint('DID NOT PLAY', 'green', 'on_red')
+					cprint('DID NOT PLAY', 'green')
 				else:
-					stats.append(Player(name, team))
-					stat_data = data
-			else:
-				stat_data = [stat_data, row_data[1:]]
-			
+					idx = get_name(roster, name)
+					if idx != -1:
+						roster[idx].add_advStats(data[1:])
+
 	def clearLists(self):
 		# makes all lists empty (never try to save or delete after using clearLists)
 		self.lists, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list = ([] for i in range(7))
-
