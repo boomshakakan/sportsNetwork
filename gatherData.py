@@ -13,22 +13,25 @@ import datetime
 import re
 import os
 
-def find_name(roster, name):
-	# returns f if player not found in roster / O.W returns index of player in roster list
-	for idx in range(0,len(roster)):
-		if (roster[idx].name == name):
-			return True
-	return False
+class Player():
+	def __init__(self, name, team):
+		self.name = name
+		self.team = team
+		self.stats = []
+		# print("Player: {} created for {}".format(name, team))
 
-def get_name(roster, name):
-	for idx in range(0,len(roster)):
-		if (roster[idx].name == name):
-			return idx
-	return -1
+	def add_basicStats(self, stats):
+		self.stats = stats
 
-class Roster():
-	def __init__(self, name)
+	def add_advStats(self, stats):
+		self.stats.extend(stats)
+		print("{}: {}".format(len(self.stats), self.stats))
+		print("stats added for {}".format(self.name))
+
+class Roster(Player):
+	def __init__(self):
 		self.players = []
+		self.idx = -1
 
 	def find_player(self, name):
 		for player in self.players:
@@ -42,30 +45,25 @@ class Roster():
 				return ctr
 		return -1
 
-class Player():
-	def __init__(self, name, team):
-		self.name = name
-		self.team = team
-		self.stats = []
-		# print("Player: {} created for {}".format(name, team))
+	def add_player(self, name, team):
+		if (self.find_player(name) == False):
+			self.players.append(Player(name, team))
+			self.idx = self.idx + 1
+			return True
+		else:
+			return False
 
-	def add_basicStats(self, stats):
-		self.stats = stats
+	def force_add(self, name, team):
+		self.players.append(Player(name, team))
 
-	def add_advStats(self, stats):
-		self.stats = self.stats + stats
-		print("stats added for {}".format(self.name))
+	def show_roster(self):
+		for player in self.players:
+			print(player.name)
 
-class Game():
+class Game(Roster, Player):
 	def __init__(self, date):
 		self.date = date
 		print('Game Initialized with date: {}'.format(self.date))
-
-	def set_victor(self, victory):
-		if victory:
-			self.won = True
-		else:
-			self.won = False
 
 class Season(Game):
 	# includes any possible playoff games
@@ -335,11 +333,10 @@ class Dataset():
 			table_headers = self.soup.findAll('thead')
 			# find Basic Box Score Stats
 			basicStat = [th.getText() for th in table_headers[0].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
-			advStat = [th.getText() for th in table_headers[1].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
+			advStat = [th.getText() for th in table_headers[7].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
+
 			self.stats = basicStat + advStat[1:]
 			print(self.stats)
-			# print("basic stats: {}".format(len(basicStat)))
-			# print("adv stats: {}".format(len(advStat)))
 
 	def get_roster(self, team):
 		# process most recent game link and use to generate team roster
@@ -404,7 +401,9 @@ class Dataset():
 		if (self.links and self.stats):
 			# loop over all of team's season game links in self.links
 			for idx in range(0,1):
-				tag_list, home_roster, away_roster = ([] for i in range(3))
+				tag_list = []
+				away_roster = Roster()
+				home_roster = Roster()
 
 				self.get_GameURL(self.links[idx])
 				self.get_HTML(self.game_url)
@@ -413,7 +412,11 @@ class Dataset():
 
 				# find names of both teams
 				team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
-				
+				scores = [score.getText() for score in body.findAll('div', attrs={'class': "scores"})]
+				print("{} -> {} : {} -> {}".format(team_names[0], team_names[1], scores[0], scores[1]))
+				if (scores[0] < scores[1]):
+					print("away team lost")
+
 				for name in team_names:
 					# get tag from team name
 					tag = self.get_tag(name)
@@ -445,48 +448,30 @@ class Dataset():
 								
 							# NOTE write method that parses row_data
 							# contain this into a single method for avoid code reuse
-							if table_idx < 2:
-								# away team
-								print("{}: {}".format(name, row_data))
-								if name != 'Reserves':
-									if (find_name(away_roster, name) == False):
-										away_roster.append(Player(name, tag_list[0]))
-								self.add_boxStats(away_roster, name, row_data, tag_list[0])
-							else:
-								# home team
-								print("{}: {}".format(name, row_data))
-								if name != 'Reserves':
-									if (find_name(home_roster, name) == False):
-										home_roster.append(Player(name, tag_list[1]))
-										home_roster[]
-										self.add_boxStats(home_roster, name, row_data)
+							if name != 'Reserves':
+								if table_idx < 2:
+									# away team
+									print("{}: {}".format(name, row_data))
+									flag = away_roster.add_player(name, tag_list[0])
+									if (flag):
+										away_roster.players[away_roster.idx].add_basicStats(row_data)
 									else:
-										self.add_boxStats(home_roster, name, row_data)
+										idx = away_roster.get_player(name)
+										away_roster.players[idx].add_advStats(row_data[1:])
+								else:
+									# home team
+									print("{}: {}".format(name, row_data))
+									flag = home_roster.add_player(name, tag_list[1])
+									if (flag):
+										home_roster.players[home_roster.idx].add_basicStats(row_data)
+									else:
+										idx = home_roster.get_player(name)
+										home_roster.players[idx].add_advStats(row_data[1:])
 							
 							# print(row_data)
-
-				print(len(away_roster))
-				for player in away_roster:
-					print("{} with stats {}".format(player.name, player.stats))
-				print(len(home_roster))
-				for player in home_roster:
-					print("{} with stats {}".format(player.name, player.stats))
 					
 		else:
 			print("Make sure that processTeamHTML & gatherStats have executed to obtain game links...")
-
-	def add_boxStats(self, roster, name, data):
-		if (data[0] == 'Did Not Play'):
-			cprint('DID NOT PLAY', 'green', 'on_red')
-		else:
-			roster[get_name(roster, name)].add_basicStats(data)
-		else:
-				if (data[0] == 'Did Not Play'):
-					cprint('DID NOT PLAY', 'green')
-				else:
-					idx = get_name(roster, name)
-					if idx != -1:
-						roster[idx].add_advStats(data[1:])
 
 	def clearLists(self):
 		# makes all lists empty (never try to save or delete after using clearLists)
