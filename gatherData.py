@@ -204,6 +204,7 @@ class Dataset():
 				# inside of process_box is where we will have to insert our game data to database so lets pass cursor
 				self.process_BoxHTML(cur, team, year)
 
+
 			self.conn.commit()
 		else:
 			print("No db connection found...")
@@ -417,6 +418,8 @@ class Dataset():
 				if (scores[0] < scores[1]):
 					print("away team lost")
 
+				cur.execute('INSERT INTO games VALUES (?,?,?,?)')
+
 				for name in team_names:
 					# get tag from team name
 					tag = self.get_tag(name)
@@ -451,7 +454,7 @@ class Dataset():
 							if name != 'Reserves':
 								if table_idx < 2:
 									# away team
-									print("{}: {}".format(name, row_data))
+									# print("{}: {}".format(name, row_data))
 									flag = away_roster.add_player(name, tag_list[0])
 									if (flag):
 										away_roster.players[away_roster.idx].add_basicStats(row_data)
@@ -460,7 +463,7 @@ class Dataset():
 										away_roster.players[idx].add_advStats(row_data[1:])
 								else:
 									# home team
-									print("{}: {}".format(name, row_data))
+									# print("{}: {}".format(name, row_data))
 									flag = home_roster.add_player(name, tag_list[1])
 									if (flag):
 										home_roster.players[home_roster.idx].add_basicStats(row_data)
@@ -469,6 +472,10 @@ class Dataset():
 										home_roster.players[idx].add_advStats(row_data[1:])
 							
 							# print(row_data)
+				for player in away_roster:
+					print(player.stats)
+				for player in home_roster:
+					print(player.stats)
 					
 		else:
 			print("Make sure that processTeamHTML & gatherStats have executed to obtain game links...")
