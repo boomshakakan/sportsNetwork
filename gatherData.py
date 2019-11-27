@@ -61,8 +61,9 @@ class Roster(Player):
 			print(player.name)
 
 class Game(Roster, Player):
-	def __init__(self, date):
+	def __init__(self, date, outcome):
 		self.date = date
+		self.outcome = outcome # outcome == True when home team wins
 		print('Game Initialized with date: {}'.format(self.date))
 
 class Season(Game):
@@ -75,7 +76,12 @@ class Season(Game):
 	def set_numGames(self, num_games):
 		self.num_games = num_games
 
-	def add_game(self, date):
+	def find_game(self, date):
+		if date in self.games:
+			return True
+		return False
+
+	def add_game(self, date, outcome):
 		make_add = True
 		for game in self.games:
 			if date == game.date:
@@ -83,7 +89,7 @@ class Season(Game):
 		
 		if (make_add):
 				print('game added: {}'.format(date))
-				self.games.append(Game(date))
+				self.games.append(Game(date, outcome))
 
 class Team(Season, Game, Player):	
 	def __init__(self, tag):
@@ -133,17 +139,14 @@ class League(Team, Season, Game):
 		print('League Initialized with {} teams'.format(len(team_list)))
 	
 	def search_player(self, name):
-		found = False
-		# for player in self.player_list:
-		#	if (player == name):
-		if player in self.player_list:
-			found = True
+		if name in self.player_list:
+			return True
 		
-		return found
+		return False
 
 	def add_player(self, name):
 
-		if (search_player(name) == False):
+		if (self.search_player(name) == False):
 			self.player_list.append(name)
 		else:
 			print("player already in league list")
@@ -192,8 +195,8 @@ class Dataset():
 
 				self.get_TeamURL(team.tag, year)
 				self.get_HTML(self.team_url)
-				self.process_TeamHTML(team)
 				# we process the team page and get a list of links 
+				self.process_TeamHTML(team)
 				
 				if year == self.curr_year and team.roster_built == False:
 					self.get_roster(team)
@@ -278,27 +281,28 @@ class Dataset():
 		year = date[0:4]
 		month = date[4:6]
 		day = date[6:8]
-		date_stamp = year + '-' + month + '-' + day
+		date_stamp = year + '/' + month + '/' + day
 		return date_stamp
 
 	def process_TeamHTML(self, team):
 		# parses html from team page and extracts useful data into lists
 		# use getText() to extract the text content from first row column headers
 		self.links = []
-		rows = self.soup.findAll('tr')[0:]
+		rows = self.soup.findAll('tr')
 
 		# access to most recent game
 		self.lastgameLink = (self.soup.find('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})).get('href')
 		
 		for link in self.soup.findAll('a', attrs={'href': re.compile("^/boxscores/[0-9]+")})[1:]:
-			self.links.append(link.get('href'))
+			if (link.getText() == 'Box Score'):
+				self.links.append(link.get('href'))
 
 		# use the list of links to determine number of games for season
 		team.seasons[team.season_idx-1].set_numGames(len(self.links))
 
 		self.text_data = [[td.getText() for td in rows[i].findAll('td')] for i in range(len(rows))]
 
-		''' 
+		'''
 		some important columns to be able to locate:
 		column 1 or index 0 -> date
 		column 5 OR index 4 -> '' or '@' which shows 
@@ -401,82 +405,81 @@ class Dataset():
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
 		if (self.links and self.stats):
 			# loop over all of team's season game links in self.links
+			print(len(self.links))
 			for idx in range(0,1):
 				tag_list = []
 				away_roster = Roster()
 				home_roster = Roster()
+				outcome = False
 
 				self.get_GameURL(self.links[idx])
 				self.get_HTML(self.game_url)
 				date = self.get_date(self.links[idx])
-				body = self.soup.find('body')
-
-				# find names of both teams
-				team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
-				scores = [score.getText() for score in body.findAll('div', attrs={'class': "scores"})]
-				print("{} -> {} : {} -> {}".format(team_names[0], team_names[1], scores[0], scores[1]))
-				if (scores[0] < scores[1]):
-					print("away team lost")
-
-				cur.execute('INSERT INTO games VALUES (?,?,?,?)')
-
-				for name in team_names:
-					# get tag from team name
-					tag = self.get_tag(name)
-					tag_list.append(tag)
-					for team in self.league.teams:
-						if tag == team.tag:
-							# use a better asymptotic search algorithm to determine if date is in list
-							# how to ensure every team has a season initialized before adding game
-							print('{} seasons for {}'.format(team.season_idx, team.tag))
-							team.seasons[team.season_idx-1].add_game(date)
 				
-				table_body = self.soup.findAll('tbody')
-				# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
-				table_list = [table_body[0], table_body[7], table_body[8], table_body[15]]
-				# table_list[0] -> away basic stats
-				# table_list[1] -> away adv stats
-				# table_list[2] -> home basic stats
-				# table_list[3] -> home adv stats
-			
-				for table_idx in range(0, len(table_list)):
-					rows = table_list[table_idx].findAll('tr')
-					# containers for each team's players and stats
-					for idx, row in enumerate(rows):
-						name = row.find('th').getText()
-						if idx != 5:
-							# print("Name: {}".format(name))
-							# use name to find player_id and insert game stats with corresponding id
-							row_data = [td.getText() for td in row.findAll('td')]
-								
-							# NOTE write method that parses row_data
-							# contain this into a single method for avoid code reuse
-							if name != 'Reserves':
-								if table_idx < 2:
-									# away team
-									# print("{}: {}".format(name, row_data))
-									flag = away_roster.add_player(name, tag_list[0])
-									if (flag):
-										away_roster.players[away_roster.idx].add_basicStats(row_data)
-									else:
-										idx = away_roster.get_player(name)
-										away_roster.players[idx].add_advStats(row_data[1:])
-								else:
-									# home team
-									# print("{}: {}".format(name, row_data))
-									flag = home_roster.add_player(name, tag_list[1])
-									if (flag):
-										home_roster.players[home_roster.idx].add_basicStats(row_data)
-									else:
-										idx = home_roster.get_player(name)
-										home_roster.players[idx].add_advStats(row_data[1:])
-							
-							# print(row_data)
-				for player in away_roster:
-					print(player.stats)
-				for player in home_roster:
-					print(player.stats)
+				if (team.seasons[team.season_idx-1].find_game(date) == False):
 					
+					body = self.soup.find('body')
+					# find names of both teams
+					team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
+					scores = [score.getText() for score in body.findAll('div', attrs={'class': "scores"})]
+					if (scores[0] < scores[1]):
+						outcome = True
+					
+					for name in team_names:
+						# get tag from team name
+						tag = self.get_tag(name)
+						tag_list.append(tag)
+						for tmp_team in self.league.teams:
+							if tag == tmp_team.tag:
+								# use a better asymptotic search algorithm to determine if date is in list
+								# how to ensure every team has a season initialized before adding game
+								print('{} seasons for {}'.format(tmp_team.season_idx, tmp_team.tag))
+								tmp_team.seasons[team.season_idx-1].add_game(date, outcome)
+					
+					cur.execute('INSERT INTO games (away_team, home_team, game_day, home_won) VALUES (?,?,?,?)', (tag_list[0], tag_list[1], date, outcome))
+					
+					table_body = self.soup.findAll('tbody')
+					# from this we get an array of all the table body and header HTML, total of 4 (2 of each)
+					table_list = [table_body[0], table_body[7], table_body[8], table_body[15]]
+					# table_list[0] -> away basic stats
+					# table_list[1] -> away adv stats
+					# table_list[2] -> home basic stats
+					# table_list[3] -> home adv stats
+				
+					for table_idx in range(0, len(table_list)):
+						rows = table_list[table_idx].findAll('tr')
+						# containers for each team's players and stats
+						for idx, row in enumerate(rows):
+							name = row.find('th').getText()
+							if idx != 5:
+								# print("Name: {}".format(name))
+								# use name to find player_id and insert game stats with corresponding id
+								row_data = [td.getText() for td in row.findAll('td')]
+								
+								if name != 'Reserves':
+									if table_idx < 2:
+										# away team
+										# print("{}: {}".format(name, row_data))
+										flag = away_roster.add_player(name, tag_list[0])
+										if (flag):
+											away_roster.players[away_roster.idx].add_basicStats(row_data)
+											self.league.add_player(name)
+										else:
+											idx = away_roster.get_player(name)
+											away_roster.players[idx].add_advStats(row_data[1:])
+									else:
+										# home team
+										# print("{}: {}".format(name, row_data))
+										flag = home_roster.add_player(name, tag_list[1])
+										if (flag):
+											home_roster.players[home_roster.idx].add_basicStats(row_data)
+											# checks to make sure name not already in list, then append to list
+											self.league.add_player(name)
+										else:
+											idx = home_roster.get_player(name)
+											home_roster.players[idx].add_advStats(row_data[1:])
+								
+								# print(row_data)
 		else:
 			print("Make sure that processTeamHTML & gatherStats have executed to obtain game links...")
 

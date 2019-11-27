@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS games (
 	game_ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
 	away_team VARCHAR(5),
 	home_team VARCHAR(5),
-	game_day DATE,
+	game_day DATE, 
 	home_won BOOLEAN
 	);
 

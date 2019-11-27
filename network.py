@@ -13,7 +13,9 @@ def main():
 	dataset.get_statnames()
 	dataset.populate_DB()
 	dataset.destroy_connection()
-	print(dataset.league.team_dict)
+	#print(dataset.league.team_dict)
+	print(len(dataset.league.player_list))
+	print(dataset.league.player_list)
 
 	for team in dataset.league.teams:
 		team.show_seasons()
