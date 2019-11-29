@@ -17,9 +17,11 @@ def main():
 	print(len(dataset.league.player_list))
 	print(dataset.league.player_list)
 
+	'''
 	for team in dataset.league.teams:
 		team.show_seasons()
 		team.show_roster()
+	'''
 
 if __name__ == "__main__":
 	main()
