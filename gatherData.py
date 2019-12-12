@@ -184,18 +184,21 @@ class Dataset():
 			# we will eventually loop through years in order to pull data for a span of decades?
 			for team in self.league.teams:
 				cur.execute("INSERT INTO teams ('name') VALUES (?)", (team.tag, ))
-				print(cur.lastrowid)
 
 				self.get_TeamURL(team.tag, year)
 				self.get_HTML(self.team_url)
 				# we process the team page and get a list of links 
 				self.process_TeamHTML(team)
 				
-				if year == self.curr_year and team.roster_built == False:
+				if team.roster_built == False:
 					self.get_roster(team)
-					
+		
+				# cur.lastrowid should have the id of team inserted into table
+				team_id = cur.lastrowid
+				# sample query to find all players from specified team
+				# SELECT * FROM players WHERE team_ID = (SELECT team_ID FROM teams WHERE name = 'CHI');
 				for player in team.roster:
-					cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (cur.lastrowid, player.name))
+					cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team_id, player))
 				
 				# inside of process_box is where we will have to insert our game data to database so we pass cursor
 				self.process_BoxHTML(cur, team, year)
@@ -446,7 +449,6 @@ class Dataset():
 								if name != 'Reserves':
 									if table_idx < 2:
 										# away team
-										# print("{}: {}".format(name, row_data))
 										flag = away_roster.add_player(name, tag_list[0])
 										if (flag):
 											away_roster.players[away_roster.idx].add_basicStats(row_data)
@@ -457,7 +459,6 @@ class Dataset():
 												away_roster.players[idx].add_advStats(row_data[1:])
 									else:
 										# home team
-										# print("{}: {}".format(name, row_data))
 										flag = home_roster.add_player(name, tag_list[1])
 										if (flag):
 											home_roster.players[home_roster.idx].add_basicStats(row_data)
@@ -467,14 +468,6 @@ class Dataset():
 											idx = home_roster.get_player(name)
 											if idx != -1:
 												home_roster.players[idx].add_advStats(row_data[1:])
-					# loop through both roster objects and insert player data into database
-					for player in away_roster.players:
-						print(player.stats)
-						# write function here to insert all stats
-
-					for player in home_roster.players:
-						print(player.stats)
-						# write function here to insert all stats
 		else:
 			print("Make sure that processTeamHTML & gatherStats have executed to obtain game links...")
 
