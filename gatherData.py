@@ -192,8 +192,9 @@ class Dataset():
 			
 			for team in self.league.teams:
 				cur.execute("INSERT INTO teams ('name') VALUES (?)", (team.tag, ))
+				team_id = cur.lastrowid
 
-				# maybe loop goes here?
+				# loops for years (curr_year - x)
 				for x in range(0, 1):
 					self.get_TeamURL(team.tag, year-x)
 					self.get_HTML(self.team_url)
@@ -202,13 +203,12 @@ class Dataset():
 					
 					if team.roster_built == False:
 						self.get_roster(team)
-			
-					# cur.lastrowid should have the id of team inserted into table
-					team_id = cur.lastrowid
+
 					# sample query to find all players from specified team
 					# SELECT * FROM players WHERE team_ID = (SELECT team_ID FROM teams WHERE name = 'CHI');
 					for player in team.roster:
-						cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team_id, player))
+						self.insert_player(cur, player, team_id)
+						# cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team_id, player))
 					
 					# inside of process_box is where we will have to insert our game data to database so we pass cursor
 					self.process_BoxHTML(cur, team, year-x)
@@ -400,6 +400,39 @@ class Dataset():
 							self.league.teams[team_list[table_idx].idx].add_player(name)
 							self.league.add_player(name)
 
+	def insert_player(self, cur, name, team_id):
+		# performs insertions into players table and returns player_ID
+		cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team_id, name))
+		return cur.lastrowid
+
+	# def prepare_stats(self, cur, stats):
+
+
+	def insert_gameStat(self, cur, roster, game_id):
+		# when called you are passing a full roster with game_stats
+		# adds to player table if no entry is found for listed player
+		for player in roster.players:
+			cur.execute('''SELECT player_id FROM players WHERE name = ?''', (player.name,))
+			tmp_id = cur.fetchone()
+
+			print("{} -> {}".format(player.name, tmp_id))
+
+			if tmp_id is None:
+				# since it was not added when rosters were found we add with team_id = -1
+				player_id = self.insert_player(cur, player.name, -1)
+				print(len(player.stats))
+				cur.execute('''INSERT INTO game_stats (game_ID, player_ID, MP, FG, FGA, FGP, TP, TPA, TPP, FT, FTA, FTP,\
+					ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS, plusMINUS, TSP, eFGP, TPAr, FTr, ORBP, DRBP, TRBP, ASTP,\
+						STLP, BLKP, TOVP, USGP, ORtg, DRtg) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\
+							?,?,?,?,?,?,?,?,?,?)''', (game_id, player_id, player.stats))
+					 
+				# here insert game_stat for this newly inserted payer
+			else:
+				player_id = tmp_id[0]
+
+				# insert game_stat
+			# cur.execute('''INSERT INTO game_stats (team_id, name) VALUES (?,?)''', (team_id, player))
+
 	def process_BoxHTML(self, cur, team, year):
 		# parses html from box score page and pulls useful data from a single game link
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
@@ -438,15 +471,16 @@ class Dataset():
 								tmp_team.seasons[tmp_team.season_idx-1].add_game(date)
 					
 					cur.execute('INSERT INTO games (away_team, home_team, game_day, home_won) VALUES (?,?,?,?)', (tag_list[0], tag_list[1], date, home_won))
-					print("check id value for game insertion: {}".format(cur.lastrowid)) # verified
-					# cur.lastrowid will be the game id that we will insert into game_stats table
+					game_id = cur.lastrowid
 					
 					table_body = self.soup.findAll('tbody')
 					table_list = [table_body[0], table_body[7], table_body[8], table_body[15]]
-					# table_list[0] -> away basic stats
-					# table_list[1] -> away adv stats
-					# table_list[2] -> home basic stats
-					# table_list[3] -> home adv stats
+					'''
+					table_list[0] -> away basic stats
+					table_list[1] -> away adv stats
+					table_list[2] -> home basic stats
+					table_list[3] -> home adv stats
+					'''
 				
 					for table_idx in range(0, len(table_list)):
 						rows = table_list[table_idx].findAll('tr')
@@ -457,7 +491,6 @@ class Dataset():
 								# use name to find player_id and insert game stats with corresponding id
 								row_data = [td.getText() for td in row.findAll('td')]
 								if name != 'Reserves':
-									
 									if table_idx < 2:
 										# away team
 										self.league.stat_process(away_roster, name, tag_list[0], row_data)
@@ -467,7 +500,11 @@ class Dataset():
 
 								if (self.league.find_player(name) == False):
 									self.league.add_player(name)
-								
+
+					# write function to parse roster object insert stats
+					self.insert_gameStat(cur, away_roster, game_id)
+					self.insert_gameStat(cur, home_roster, game_id)
+
 					# after loops execute creating both rosters we need to insert stats into game_stats tables
 		else:
 			print("Make sure that processTeamHTML & gatherStats have executed to obtain game links...")
