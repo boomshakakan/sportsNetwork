@@ -13,12 +13,16 @@ import datetime
 import re
 import os
 
+class Stats():
+	def __init__(self):
+		self.stats = []
+
 class Player():
 	def __init__(self, name, team):
 		self.name = name
 		self.team = team
 		self.stats = []
-		# print("Player: {} created for {}".format(name, team))
+		
 
 	def add_basicStats(self, stats):
 		self.stats = stats
@@ -130,7 +134,7 @@ class League(Team, Season, Game):
 			self.teams.append(Team(team_list[x]))
 			self.teams[x].idx = x
 			self.teams[x].init_season(year)
-		print('League Initialized with {} teams'.format(len(team_list)))
+		print('League Initialized with {} teams'.format(len(self.teams)))
 	
 	def find_player(self, name):
 		if name in self.player_list:
@@ -208,7 +212,6 @@ class Dataset():
 					# SELECT * FROM players WHERE team_ID = (SELECT team_ID FROM teams WHERE name = 'CHI');
 					for player in team.roster:
 						self.insert_player(cur, player, team_id)
-						# cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team_id, player))
 					
 					# inside of process_box is where we will have to insert our game data to database so we pass cursor
 					self.process_BoxHTML(cur, team, year-x)
@@ -224,7 +227,7 @@ class Dataset():
 		self.get_TeamURL(tmp_team.tag, self.curr_year)
 		self.get_HTML(self.team_url)
 		self.process_TeamHTML(tmp_team)
-		self.gather_stats()
+		self.gather_stats(0)
 
 	def get_tag(self, teamName):
 		# given full team name return team's tag OR create dictionary entry for relation
@@ -332,12 +335,12 @@ class Dataset():
 		# make list of all lists
 		self.lists = [self.dates, self.court_list, self.opponent_list, self.result_list, self.score_list, self.oppScore_list, self.streak_list, self.links]
 
-	def gather_stats(self):
+	def gather_stats(self, idx):
 		# peek at the box score page and pull stat names / self.stats contains two lists
 		if self.links != []:
 			self.stats = []
 
-			self.get_GameURL(self.links[0])
+			self.get_GameURL(self.links[idx])
 			self.get_HTML(self.game_url)
 
 			table_headers = self.soup.findAll('thead')
@@ -405,9 +408,6 @@ class Dataset():
 		cur.execute('''INSERT INTO players (team_id, name) VALUES (?,?)''', (team_id, name))
 		return cur.lastrowid
 
-	# def prepare_stats(self, cur, stats):
-
-
 	def insert_gameStat(self, cur, roster, game_id):
 		# when called you are passing a full roster with game_stats
 		# adds to player table if no entry is found for listed player
@@ -420,11 +420,27 @@ class Dataset():
 			if tmp_id is None:
 				# since it was not added when rosters were found we add with team_id = -1
 				player_id = self.insert_player(cur, player.name, -1)
-				print(len(player.stats))
-				cur.execute('''INSERT INTO game_stats (game_ID, player_ID, MP, FG, FGA, FGP, TP, TPA, TPP, FT, FTA, FTP,\
+				print("# stats -> {}".format(len(player.stats)))
+				
+				'''
+				cur.execute("INSERT INTO game_stats (game_ID, player_ID, MP, FG, FGA, FGP, TP, TPA, TPP, FT, FTA, FTP,\
 					ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS, plusMINUS, TSP, eFGP, TPAr, FTr, ORBP, DRBP, TRBP, ASTP,\
 						STLP, BLKP, TOVP, USGP, ORtg, DRtg) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\
-							?,?,?,?,?,?,?,?,?,?)''', (game_id, player_id, player.stats))
+							?,?,?,?,?,?,?,?,?,?)", (game_id, player_id, player.stats[0], player.stats[1], player.stats[2], \
+								player.stats[3], player.stats[4], player.stats[5], player.stats[6], player.stats[7], player.stats[8], \
+									player.stats[9], player.stats[10], player.stats[11], player.stats[12], player.stats[13], player.stats[14], \
+										player.stats[15], player.stats[16], player.stats[17], player.stats[18], player.stats[19], player.stats[20], \
+											player.stats[21], player.stats[22], player.stats[23], player.stats[24], player.stats[25], player.stats[26], \
+												player.stats[27], player.stats[28], player.stats[29], player.stats[30], player.stats[31], player.stats[32], \
+													player.stats[33]))
+				'''
+
+				sql = '''INSERT INTO game_stats (MP, FG, FGA, FGP, TP, TPA, TPP, FT, FTA, FTP,\
+					ORB, DRB, TRB, AST, STL, BLK, TOV, PF, PTS, plusMINUS, TSP, eFGP, TPAr, FTr, ORBP, DRBP, TRBP, ASTP,\
+						STLP, BLKP, TOVP, USGP, ORtg, DRtg) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,\
+							?,?,?,?,?,?,?,?)'''
+
+				cur.execute(sql, player.stats)
 					 
 				# here insert game_stat for this newly inserted payer
 			else:
@@ -436,12 +452,14 @@ class Dataset():
 	def process_BoxHTML(self, cur, team, year):
 		# parses html from box score page and pulls useful data from a single game link
 		# you must execute processTeamHTML & gatherStats to obtain links and stat names before calling this function
-		if (self.links and self.stats):
+		if self.links:
 			# loop over all of team's season game links in self.links
 			print(len(self.links))
-
 			for idx in range(0,1):
 				tag_list = []
+				stat_names = []
+				basic_stat = []
+				adv_stat = []
 				away_roster = Roster()
 				home_roster = Roster()
 				home_won = False
@@ -455,6 +473,26 @@ class Dataset():
 					body = self.soup.find('body')
 					team_names = [name.getText() for name in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
 					scores = [score.getText() for score in body.findAll('div', attrs={'class': "scores"})]
+
+					table_headers = self.soup.findAll('thead')
+					# find Basic Box Score Stats
+					
+					# print("{}: {}".format(len(table_headers), table_headers))
+
+					for x in range(0, len(table_headers)):
+						basic_stat = [th.getText() for th in table_headers[x].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
+						adv_tmp = [th.getText() for th in table_headers[x].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
+
+						print("basic stats -> {}\nadv stats -> {}".format(basic_stat, adv_stat))
+						
+					'''
+					basic_stat = [th.getText() for th in table_headers[0].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
+					test_stat = [th.getText() for th in table_headers[6].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
+					adv_stat = [th.getText() for th in table_headers[7].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
+
+					print("basic stats -> {}: {}".format(len(basic_stat), basic_stat))
+					print("adv stats -> {}: {}".format(len(adv_stat), adv_stat))
+					'''
 
 					if (scores[0] < scores[1]):
 						home_won = True
@@ -505,7 +543,6 @@ class Dataset():
 					self.insert_gameStat(cur, away_roster, game_id)
 					self.insert_gameStat(cur, home_roster, game_id)
 
-					# after loops execute creating both rosters we need to insert stats into game_stats tables
 		else:
 			print("Make sure that processTeamHTML & gatherStats have executed to obtain game links...")
 
