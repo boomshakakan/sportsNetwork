@@ -363,7 +363,6 @@ class Dataset():
 		body = self.soup.find('body')
 		team_names = [team.getText() for team in body.findAll('a', attrs={'href': re.compile("^/teams/"), 'itemprop': "name"})]
 
-		# flag = False
 		for name in team_names:
 			tag = self.get_tag(name)
 			tag_list.append(tag)
@@ -379,7 +378,9 @@ class Dataset():
 						team_list.append(self.league.teams[x])
 	
 		table_body = self.soup.findAll('tbody')
+		# hard coding these values may lead to issues 
 		table_list = [table_body[0], table_body[8]]
+		
 		# table_list[0] -> away basic stats 
 		# table_list[1] -> home basic stats
 
@@ -418,7 +419,8 @@ class Dataset():
 			print("{} -> {}".format(player.name, tmp_id))
 
 			if tmp_id is None:
-				# since it was not added when rosters were found we add with team_id = -1
+				# since it was not added when rosters were found we add with team_id = -1 indicating that the player may
+				# not still play with this team
 				player_id = self.insert_player(cur, player.name, -1)
 				print("# stats -> {}".format(len(player.stats)))
 				
@@ -457,7 +459,6 @@ class Dataset():
 			print(len(self.links))
 			for idx in range(0,1):
 				tag_list = []
-				stat_names = []
 				basic_stat = []
 				adv_stat = []
 				away_roster = Roster()
@@ -476,14 +477,17 @@ class Dataset():
 
 					table_headers = self.soup.findAll('thead')
 					# find Basic Box Score Stats
-					
-					# print("{}: {}".format(len(table_headers), table_headers))
 
-					for x in range(0, len(table_headers)):
-						basic_stat = [th.getText() for th in table_headers[x].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
-						adv_tmp = [th.getText() for th in table_headers[x].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
+					basic_stat = [th.getText() for th in table_headers[0].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
 
-						print("basic stats -> {}\nadv stats -> {}".format(basic_stat, adv_stat))
+					adv_idx = 0
+					while adv_stat == []:
+						# basic_stat = [th.getText() for th in table_headers[x].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
+						
+						adv_stat = [th.getText() for th in table_headers[adv_idx].findAll('th', attrs={'data-over-header': "Advanced Box Score Stats"})]
+
+						print("index: {} \nbasic stats -> {}\nadv stats -> {}".format(adv_idx, basic_stat, adv_stat))
+						adv_idx = adv_idx + 1
 						
 					'''
 					basic_stat = [th.getText() for th in table_headers[0].findAll('th', attrs={'data-over-header': "Basic Box Score Stats"})]
@@ -492,7 +496,7 @@ class Dataset():
 
 					print("basic stats -> {}: {}".format(len(basic_stat), basic_stat))
 					print("adv stats -> {}: {}".format(len(adv_stat), adv_stat))
-					'''
+					''' 
 
 					if (scores[0] < scores[1]):
 						home_won = True
